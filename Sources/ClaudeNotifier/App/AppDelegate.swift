@@ -145,7 +145,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.collectionBehavior = [NSWindow.CollectionBehavior.transient,
                                      NSWindow.CollectionBehavior.ignoresCycle]
         panel.isReleasedWhenClosed = false
-        panel.contentView = NSHostingView(rootView: menuBarView!)
+
+        // Visual effect backdrop (native macOS frosted glass)
+        let visualEffect = NSVisualEffectView(frame: NSRect(origin: .zero, size: contentRect.size))
+        visualEffect.material = .popover
+        visualEffect.blendingMode = .behindWindow
+        visualEffect.state = .active
+        visualEffect.wantsLayer = true
+        visualEffect.layer?.cornerRadius = 10
+        visualEffect.layer?.masksToBounds = true
+
+        let hostingView = NSHostingView(rootView: menuBarView!)
+        hostingView.translatesAutoresizingMaskIntoConstraints = false
+        visualEffect.addSubview(hostingView)
+        NSLayoutConstraint.activate([
+            hostingView.topAnchor.constraint(equalTo: visualEffect.topAnchor),
+            hostingView.bottomAnchor.constraint(equalTo: visualEffect.bottomAnchor),
+            hostingView.leadingAnchor.constraint(equalTo: visualEffect.leadingAnchor),
+            hostingView.trailingAnchor.constraint(equalTo: visualEffect.trailingAnchor),
+        ])
+
+        panel.contentView = visualEffect
 
         popupWindow = panel
         panel.makeKeyAndOrderFront(nil)
