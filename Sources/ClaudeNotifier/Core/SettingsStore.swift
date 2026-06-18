@@ -4,9 +4,25 @@ import ServiceManagement
 
 /// Central settings store backed by UserDefaults via @AppStorage.
 /// Published via ObservableObject so SwiftUI views react to changes.
+/// Default values adapt to system language (Chinese / English).
 @MainActor
 final class SettingsStore: ObservableObject {
     static let shared = SettingsStore()
+
+    private init() {
+        // Register localized defaults before @AppStorage reads them.
+        let defaults: [String: Any] = [
+            "soundForStop": "Glass",
+            "soundForNotification": "Ping",
+            "customSoundPath": "",
+            "notificationTitle": L10n.defaultTitle,
+            "stopSubtitleTemplate": L10n.defaultStopSubtitle,
+            "stopMessageTemplate": L10n.defaultStopMessage,
+            "notificationSubtitleTemplate": L10n.defaultNotifSubtitle,
+            "notificationMessageTemplate": L10n.defaultNotifMessage,
+        ]
+        UserDefaults.standard.register(defaults: defaults)
+    }
 
     // MARK: - Sound settings
 
@@ -22,19 +38,19 @@ final class SettingsStore: ObservableObject {
     // MARK: - Notification content
 
     @AppStorage("notificationTitle")
-    var notificationTitle: String = "Claude Code"
+    var notificationTitle: String = L10n.defaultTitle
 
     @AppStorage("stopSubtitleTemplate")
-    var stopSubtitleTemplate: String = "Task Complete"
+    var stopSubtitleTemplate: String = L10n.defaultStopSubtitle
 
     @AppStorage("stopMessageTemplate")
-    var stopMessageTemplate: String = "Claude is ready — awaiting your next instruction"
+    var stopMessageTemplate: String = L10n.defaultStopMessage
 
     @AppStorage("notificationSubtitleTemplate")
-    var notificationSubtitleTemplate: String = "Needs Your Confirmation"
+    var notificationSubtitleTemplate: String = L10n.defaultNotifSubtitle
 
     @AppStorage("notificationMessageTemplate")
-    var notificationMessageTemplate: String = "Claude is waiting for your input"
+    var notificationMessageTemplate: String = L10n.defaultNotifMessage
 
     // MARK: - Behavior
 

@@ -15,7 +15,7 @@ struct MenuBarView: View {
             HStack {
                 Image(systemName: "bell.badge.fill")
                     .font(.title3)
-                Text("Claude Notifier")
+                Text(L10n.menuTitle)
                     .font(.headline)
                 Spacer()
                 Button(action: onToggleMute) {
@@ -25,7 +25,7 @@ struct MenuBarView: View {
                         .foregroundColor(settings.muted ? .secondary : .accentColor)
                 }
                 .buttonStyle(.plain)
-                .help(settings.muted ? "Unmute" : "Mute")
+                .help(L10n.muteTooltip)
             }
             .padding(.horizontal, 12)
             .padding(.top, 12)
@@ -38,7 +38,7 @@ struct MenuBarView: View {
                 Circle()
                     .fill(Color.green)
                     .frame(width: 6, height: 6)
-                Text("Listening on 127.0.0.1")
+                Text(L10n.listening)
                     .font(.system(size: 10))
                     .foregroundColor(.secondary)
                 Spacer()
@@ -51,7 +51,7 @@ struct MenuBarView: View {
             // Recent notifications
             if !notificationManager.recentNotifications.isEmpty {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("RECENT")
+                    Text(L10n.recentHeader)
                         .font(.system(size: 9, weight: .semibold))
                         .foregroundColor(.secondary)
                         .padding(.horizontal, 12)
@@ -84,9 +84,9 @@ struct MenuBarView: View {
                 Divider()
             }
 
-            // Quick toggle
+            // Clear history
             if !notificationManager.recentNotifications.isEmpty {
-                Button("Clear History") {
+                Button(L10n.clearHistory) {
                     notificationManager.recentNotifications.removeAll()
                 }
                 .buttonStyle(.plain)
@@ -97,8 +97,8 @@ struct MenuBarView: View {
                 Divider()
             }
 
-            // Actions
-            Button("Settings\u{2026}") {
+            // Settings
+            Button(L10n.settingsButton) {
                 onOpenSettings()
             }
             .buttonStyle(.plain)
@@ -107,7 +107,8 @@ struct MenuBarView: View {
 
             Divider()
 
-            Button("Quit Claude Notifier") {
+            // Quit
+            Button(L10n.quitButton) {
                 onQuit()
             }
             .buttonStyle(.plain)

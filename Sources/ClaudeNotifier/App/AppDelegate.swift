@@ -137,7 +137,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             backing: .buffered,
             defer: false
         )
-        window.title = "Claude Notifier Settings"
+        window.title = L10n.settingsWindowTitle
         window.contentView = NSHostingView(
             rootView: SettingsView(settings: settingsStore)
         )

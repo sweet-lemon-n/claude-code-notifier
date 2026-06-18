@@ -19,7 +19,7 @@ struct SoundPickerView: View {
                     Text(name).tag(name)
                 }
                 Divider()
-                Text("Custom...").tag("__custom__")
+                Text(L10n.customOption).tag("__custom__")
             }
             .frame(width: 160)
             .onChange(of: selection) { _, newValue in
@@ -29,12 +29,14 @@ struct SoundPickerView: View {
             }
 
             if selection == "__custom__" {
-                Button("Choose...") {
+                Button(L10n.chooseFile) {
                     showFilePicker = true
                 }
                 .buttonStyle(.link)
                 if !settings.customSoundPath.isEmpty {
-                    Text("✓ Set").foregroundColor(.green).font(.caption)
+                    Text("\u{2713} \(L10n.fileSet)")
+                        .foregroundColor(.green)
+                        .font(.caption)
                 }
             }
         }

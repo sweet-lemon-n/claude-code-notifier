@@ -8,19 +8,19 @@ struct SettingsView: View {
         TabView {
             GeneralTab(settings: settings)
                 .tabItem {
-                    Label("General", systemImage: "gearshape")
+                    Label(L10n.tabGeneral, systemImage: "gearshape")
                 }
             SoundsTab(settings: settings)
                 .tabItem {
-                    Label("Sounds", systemImage: "speaker.wave.2")
+                    Label(L10n.tabSounds, systemImage: "speaker.wave.2")
                 }
             MessagesTab(settings: settings)
                 .tabItem {
-                    Label("Messages", systemImage: "text.bubble")
+                    Label(L10n.tabMessages, systemImage: "text.bubble")
                 }
             AboutTab()
                 .tabItem {
-                    Label("About", systemImage: "info.circle")
+                    Label(L10n.tabAbout, systemImage: "info.circle")
                 }
         }
         .frame(minWidth: 480, minHeight: 360)
@@ -36,14 +36,11 @@ struct GeneralTab: View {
     var body: some View {
         Form {
             Section {
-                Toggle("Launch at Login", isOn: $settings.launchAtLogin)
-
-                Toggle("Show notification preview", isOn: $settings.showNotificationPreview)
-
-                Toggle("Enable sound", isOn: $settings.enableSound)
-
+                Toggle(L10n.launchAtLogin, isOn: $settings.launchAtLogin)
+                Toggle(L10n.showPreview, isOn: $settings.showNotificationPreview)
+                Toggle(L10n.enableSound, isOn: $settings.enableSound)
             } header: {
-                Text("Behavior")
+                Text(L10n.behaviorSection)
             }
         }
         .formStyle(.grouped)
@@ -60,20 +57,19 @@ struct SoundsTab: View {
         Form {
             Section {
                 SoundPickerView(
-                    label: "Task Complete",
+                    label: L10n.taskCompleteLabel,
                     selection: $settings.soundForStop,
                     settings: settings
                 )
-
                 SoundPickerView(
-                    label: "Needs Confirm",
+                    label: L10n.needsConfirmLabel,
                     selection: $settings.soundForNotification,
                     settings: settings
                 )
             } header: {
-                Text("Alert Sounds")
+                Text(L10n.alertSoundsSection)
             } footer: {
-                Text("Select a system sound or choose Custom to pick your own audio file. Click a sound name to preview.")
+                Text(L10n.soundsFooter)
             }
         }
         .formStyle(.grouped)
@@ -89,25 +85,25 @@ struct MessagesTab: View {
     var body: some View {
         Form {
             Section {
-                TextField("Title", text: $settings.notificationTitle)
+                TextField(L10n.notificationTitle, text: $settings.notificationTitle)
             } header: {
-                Text("Common")
+                Text(L10n.commonSection)
             }
 
             Section {
-                TextField("Subtitle", text: $settings.stopSubtitleTemplate)
-                TextField("Message", text: $settings.stopMessageTemplate)
+                TextField(L10n.subtitleLabel, text: $settings.stopSubtitleTemplate)
+                TextField(L10n.messageLabel, text: $settings.stopMessageTemplate)
             } header: {
-                Text("Task Complete (Stop Event)")
+                Text(L10n.stopSection)
             } footer: {
-                Text("Use {project} for project folder name, {path} for full path.")
+                Text(L10n.templateFooter)
             }
 
             Section {
-                TextField("Subtitle", text: $settings.notificationSubtitleTemplate)
-                TextField("Message", text: $settings.notificationMessageTemplate)
+                TextField(L10n.subtitleLabel, text: $settings.notificationSubtitleTemplate)
+                TextField(L10n.messageLabel, text: $settings.notificationMessageTemplate)
             } header: {
-                Text("Needs Confirmation (Notification Event)")
+                Text(L10n.notifSection)
             }
         }
         .formStyle(.grouped)
@@ -124,26 +120,26 @@ struct AboutTab: View {
                 .resizable()
                 .frame(width: 80, height: 80)
 
-            Text("Claude Notifier")
+            Text(L10n.menuTitle)
                 .font(.title2)
                 .fontWeight(.semibold)
 
-            Text("Version 1.0.0")
+            Text(L10n.versionLabel)
                 .font(.subheadline)
                 .foregroundColor(.secondary)
 
-            Text("Desktop notifications for Claude Code.\nGet alerted when Claude finishes a task or needs your input.")
+            Text(L10n.aboutDescription)
                 .multilineTextAlignment(.center)
                 .font(.callout)
                 .foregroundColor(.secondary)
                 .padding(.horizontal, 40)
 
-            Link("GitHub Repository",
+            Link(L10n.githubLink,
                  destination: URL(string: "https://github.com/sweet-lemon-n/claude-code-notifier")!)
                 .font(.callout)
                 .padding(.top, 8)
 
-            Text("MIT License")
+            Text(L10n.licenseLabel)
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
