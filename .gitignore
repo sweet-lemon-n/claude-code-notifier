@@ -1,5 +1,21 @@
+# Build artifacts
+.build/
+*.xcodeproj
+*.xcworkspace
+xcuserdata/
+DerivedData/
+
+# Backups
 *.bak
 *.log
+
+# macOS
 .DS_Store
 *.swp
 *~
+
+# IDE
+.idea/
+
+# Local Claude Code config (per-user)
+.claude/

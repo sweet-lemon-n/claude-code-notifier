@@ -1,201 +1,153 @@
-# Claude Code 通知插件 / Claude Code Notifier
+# 🔔 Claude Notifier
 
 [English](#english) | [中文](#中文)
+
+> macOS 原生菜单栏 App，在 Claude Code 任务完成或需要确认时弹出系统通知 + 提示音。点击通知自动跳转到对应的 VSCode 窗口。
+
+<p align="center">
+  <img src="Resources/Assets.xcassets/AppIcon.appiconset/icon_128.png" width="128" alt="ClaudeNotifier icon">
+</p>
 
 ---
 
 ## 中文
 
-### 问题
-使用 Claude Code 编程时，Claude 在后台运行，你切到别的窗口干活，经常忘记回来看。等你想起来时，Claude 早就写完了代码在那等你确认。
+### ✨ 功能
 
-### 解决方案
-这个插件通过 Claude Code 的 **Hooks 机制**，在以下时机自动弹出 macOS 系统通知 + 提示音：
-- **任务完成**：Claude 写完代码，等待你的下一步指令
-- **需要确认**：Claude 需要你输入、选择或批准某个操作
+- 🔔 **自动通知** — Claude Code 任务完成（Stop 事件）/ 需要确认（Notification 事件）时弹系统通知
+- 🎵 **自定义音效** — 14 种系统音效可选，也支持自定义音频文件
+- 🪟 **点击跳转** — 点通知自动跳到对应项目的 VSCode 窗口
+- ⚙️ **图形化设置** — 完整的 macOS 原生设置面板
+- 📋 **通知历史** — 菜单栏弹窗内查看最近通知
+- 🔇 **一键静音** — 菜单栏图标一键开关
 
-### 特性
-- ✅ **零依赖**：纯 Bash 脚本 + macOS 自带工具（`osascript` / `afplay`）
-- ✅ **即装即用**：一行命令安装，自动写入 `~/.claude/settings.json`
-- ✅ **自定义音效**：通过环境变量修改提示音
-- ✅ **安全卸载**：自动备份配置，支持一键卸载
-
-### 安装
+### 📦 安装
 
 ```bash
-git clone https://github.com/你的用户名/claude-code-notifier.git
+git clone https://github.com/sweet-lemon-n/claude-code-notifier.git
 cd claude-code-notifier
-chmod +x install.sh
-./install.sh
+make install
 ```
 
-**重启 Claude Code** 后生效。
-
-### 使用
-
-装好后无需任何操作，Claude Code 会自动在合适的时机触发通知：
-
-| 场景 | 提示音 | 通知内容 |
-|------|--------|----------|
-| 任务完成 | Glass | "Claude 已写完，等你确认下一步" |
-| 需要确认 | Ping | "Claude 正在等待你的输入" |
-
-### 自定义音效
-
-通过环境变量覆盖默认音效（需要在启动 Claude Code 前设置）：
+或者分步操作：
 
 ```bash
-export CLAUDE_NOTIFY_SOUND_STOP="Blow"      # 任务完成音效
-export CLAUDE_NOTIFY_SOUND_NOTIFY="Hero"   # 需要确认音效
+make build      # 编译
+make package    # 打包 .app
+make install    # 安装到 /Applications 并配置 hooks
 ```
 
-可用音效列表（位于 `/System/Library/Sounds/`）：
-- Basso, Blow, Bottle, Frog, Funk, Glass, Hero, Morse, Ping, Pop, Purr, Sosumi, Submarine, Tink
+安装后 **重启 Claude Code** 生效。
 
-### 卸载
+### 🖥️ 系统要求
+
+- macOS 14.0+
+- Claude Code
+- VSCode（用于点击跳转，可选）
+
+### 🔧 工作原理
+
+```
+Claude Code Hook (Stop/Notification)
+  → scripts/notify.sh（桥梁脚本）
+    → curl POST http://127.0.0.1:<port>/event
+      → ClaudeNotifier.app（菜单栏常驻，本地 HTTP 服务）
+        → 系统通知 + 音效
+        → 点击通知 → VSCodeManager 激活项目窗口
+```
+
+### ⚙️ 配置
+
+点击菜单栏图标 → **Settings** 打开设置面板：
+
+| 标签页 | 可配置项 |
+|--------|---------|
+| **General** | 开机启动、通知预览、音效开关 |
+| **Sounds** | Stop/Notification 事件各选不同音效，支持自定义音频文件 |
+| **Messages** | 自定义通知标题、副标题和正文模板，支持 `{project}` 和 `{path}` 变量 |
+| **About** | 版本信息、GitHub 链接 |
+
+### 🗑️ 卸载
 
 ```bash
-./uninstall.sh
+cd claude-code-notifier
+./scripts/uninstall.sh
 ```
 
-会自动备份 `settings.json` 并移除 hooks 配置。
+会自动：
+- 停止 App 进程
+- 从 `/Applications` 删除
+- 从 `~/.claude/settings.json` 移除 hooks
+- 清理端口文件
 
-### 原理
+### 🛠️ 开发
 
-插件在 `~/.claude/settings.json` 中注册了两个 hooks：
+```bash
+# 编译
+swift build -c release
 
-```json
-{
-  "hooks": {
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"/path/to/notify.sh\" stop"
-          }
-        ]
-      }
-    ],
-    "Notification": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"/path/to/notify.sh\" notification"
-          }
-        ]
-      }
-    ]
-  }
-}
+# 打包 .app
+bash scripts/package-app.sh
+
+# 生成 Xcode 项目（可选）
+brew install xcodegen
+xcodegen generate --spec project.yml
 ```
 
-当 Claude Code 触发这些事件时，会调用 `notify.sh` 脚本弹出系统通知。
+### 📄 开源协议
 
-### 系统要求
-- macOS 10.14+
-- Claude Code (任意版本)
-- 确保在 **系统设置 → 通知** 中允许 **脚本编辑器** 发送通知
-
-### 开源协议
 MIT License
 
 ---
 
 ## English
 
-### Problem
-When using Claude Code, Claude runs in the background while you switch to other windows. You often forget to check back, only to find Claude finished the code long ago and is waiting for your confirmation.
+### ✨ Features
 
-### Solution
-This plugin uses Claude Code's **Hooks mechanism** to automatically trigger macOS system notifications with sound alerts when:
-- **Task completed**: Claude finished writing code and awaits your next instruction
-- **Confirmation needed**: Claude requires your input, selection, or approval
+- 🔔 **Auto-notifications** — System alerts when Claude Code completes a task or needs your confirmation
+- 🎵 **Custom sounds** — 14 system sounds or your own audio file
+- 🪟 **Click-to-jump** — Click notification → activates the matching VSCode project window
+- ⚙️ **GUI settings** — Full native macOS preferences panel
+- 📋 **History** — View recent notifications in the menu bar popover
+- 🔇 **One-click mute** — Quick toggle from the menu bar
 
-### Features
-- ✅ **Zero dependencies**: Pure Bash script + macOS built-in tools (`osascript` / `afplay`)
-- ✅ **Install & go**: One-line installation, auto-configures `~/.claude/settings.json`
-- ✅ **Custom sounds**: Override default sounds via environment variables
-- ✅ **Safe uninstall**: Auto-backup config, one-click removal
-
-### Installation
+### 📦 Install
 
 ```bash
-git clone https://github.com/your-username/claude-code-notifier.git
+git clone https://github.com/sweet-lemon-n/claude-code-notifier.git
 cd claude-code-notifier
-chmod +x install.sh
-./install.sh
+make install
 ```
 
-**Restart Claude Code** to activate.
+**Restart Claude Code** after installation.
 
-### Usage
+### 🖥️ Requirements
 
-No manual action required after installation. Claude Code will automatically trigger notifications at appropriate moments:
+- macOS 14.0+
+- Claude Code
+- VSCode (optional, for click-to-jump)
 
-| Scenario | Sound | Notification Message |
-|----------|-------|---------------------|
-| Task completed | Glass | "Claude 已写完，等你确认下一步" |
-| Confirmation needed | Ping | "Claude 正在等待你的输入" |
+### 🔧 How It Works
 
-### Custom Sounds
+Claude Code hooks trigger the bridge script, which POSTs to the app's local HTTP server. The app shows a system notification and plays a sound. Clicking the notification runs `code <project-path>` to activate the matching VSCode window.
 
-Override default sounds via environment variables (set before launching Claude Code):
+### ⚙️ Settings
+
+Click the menu bar icon → **Settings**:
+
+| Tab | Options |
+|-----|---------|
+| **General** | Launch at login, notification preview, sound toggle |
+| **Sounds** | Pick different alert sounds for Stop/Notification events, custom audio files |
+| **Messages** | Custom notification title, subtitle, and body templates (`{project}`, `{path}`) |
+| **About** | Version, GitHub link |
+
+### 🗑️ Uninstall
 
 ```bash
-export CLAUDE_NOTIFY_SOUND_STOP="Blow"      # Task completion sound
-export CLAUDE_NOTIFY_SOUND_NOTIFY="Hero"   # Confirmation needed sound
+./scripts/uninstall.sh
 ```
 
-Available sounds (located in `/System/Library/Sounds/`):
-- Basso, Blow, Bottle, Frog, Funk, Glass, Hero, Morse, Ping, Pop, Purr, Sosumi, Submarine, Tink
+### 📄 License
 
-### Uninstall
-
-```bash
-./uninstall.sh
-```
-
-Automatically backs up `settings.json` and removes hooks configuration.
-
-### How It Works
-
-The plugin registers two hooks in `~/.claude/settings.json`:
-
-```json
-{
-  "hooks": {
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"/path/to/notify.sh\" stop"
-          }
-        ]
-      }
-    ],
-    "Notification": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"/path/to/notify.sh\" notification"
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-When Claude Code triggers these events, it invokes the `notify.sh` script to display system notifications.
-
-### System Requirements
-- macOS 10.14+
-- Claude Code (any version)
-- Ensure **Script Editor** is allowed to send notifications in **System Settings → Notifications**
-
-### License
 MIT License
