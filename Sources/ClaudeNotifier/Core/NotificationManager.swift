@@ -23,21 +23,46 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate, Obs
 
     // MARK: - Permission
 
+    /// Request notification permission. For LSUIElement apps we temporarily
+    /// switch to `.regular` so macOS shows the permission dialog, then switch back.
     func requestPermission() {
         let center = UNUserNotificationCenter.current()
-        center.getNotificationSettings { [weak self] settings in
+        center.getNotificationSettings { [weak self] s in
             DispatchQueue.main.async {
-                switch settings.authorizationStatus {
+                guard let self else { return }
+                switch s.authorizationStatus {
                 case .authorized, .provisional, .ephemeral:
-                    self?.unauthorized = false
+                    self.unauthorized = false
                 case .denied, .notDetermined:
+                    // Temporarily show in Dock so the permission alert can appear
+                    let prevPolicy = NSApp.activationPolicy()
+                    NSApp.setActivationPolicy(.regular)
                     center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
                         DispatchQueue.main.async {
-                            self?.unauthorized = !granted
+                            self.unauthorized = !granted
+                            NSApp.setActivationPolicy(prevPolicy)
+                            // Re-retry after a few seconds to confirm state
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
+                                self?.refreshAuthStatus()
+                            }
                         }
                     }
                 @unknown default:
-                    self?.unauthorized = true
+                    self.unauthorized = true
+                }
+            }
+        }
+    }
+
+    /// Refresh authorization status without showing a dialog.
+    private func refreshAuthStatus() {
+        UNUserNotificationCenter.current().getNotificationSettings { [weak self] s in
+            DispatchQueue.main.async {
+                switch s.authorizationStatus {
+                case .authorized, .provisional, .ephemeral:
+                    self?.unauthorized = false
+                default:
+                    break
                 }
             }
         }
@@ -50,19 +75,18 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate, Obs
             eventType: eventType, payload: payload, settings: settings
         )
 
-        // Try UNUserNotificationCenter first
-        if !unauthorized {
-            sendViaUN(eventType: eventType, payload: payload, built: built)
-        } else {
-            // Fallback: osascript always works, no permission needed
-            sendViaAppleScript(built: built, payload: payload)
-        }
-
-        // Always record history
+        // Always record
         record(eventType: eventType,
                title: built.title,
                message: built.body,
                projectPath: payload.cwd)
+
+        // Prefer UN (supports click-to-VSCode). Fall back to osascript if unauthorized.
+        if unauthorized {
+            sendViaAppleScript(built: built, payload: payload)
+        } else {
+            sendViaUN(eventType: eventType, payload: payload, built: built)
+        }
     }
 
     // MARK: - UNUserNotificationCenterDelegate
@@ -135,9 +159,7 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate, Obs
 
     @MainActor private func sendViaAppleScript(built: NotificationContentBuilder.Content,
                                      payload: HookPayload) {
-        let soundName = settings.enableSound && !settings.muted
-            ? "sound name \"Glass\"" : ""
-        // Escape quotes for AppleScript
+        // Sound is handled by SoundManager — do NOT include "sound name" here.
         let title = built.title.replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")
         let subtitle = built.subtitle.replacingOccurrences(of: "\\", with: "\\\\")
@@ -145,7 +167,7 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate, Obs
         let body = built.body.replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")
 
-        let script = "display notification \"\(body)\" with title \"\(title)\" subtitle \"\(subtitle)\" \(soundName)"
+        let script = "display notification \"\(body)\" with title \"\(title)\" subtitle \"\(subtitle)\""
         let task = Process()
         task.launchPath = "/usr/bin/osascript"
         task.arguments = ["-e", script]
