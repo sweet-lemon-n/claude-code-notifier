@@ -10,16 +10,10 @@ final class SettingsStore: ObservableObject {
     static let shared = SettingsStore()
 
     private init() {
-        // Register localized defaults before @AppStorage reads them.
         let defaults: [String: Any] = [
             "soundForStop": "Glass",
             "soundForNotification": "Ping",
             "customSoundPath": "",
-            "notificationTitle": L10n.defaultTitle,
-            "stopSubtitleTemplate": L10n.defaultStopSubtitle,
-            "stopMessageTemplate": L10n.defaultStopMessage,
-            "notificationSubtitleTemplate": L10n.defaultNotifSubtitle,
-            "notificationMessageTemplate": L10n.defaultNotifMessage,
         ]
         UserDefaults.standard.register(defaults: defaults)
     }
@@ -35,22 +29,19 @@ final class SettingsStore: ObservableObject {
     @AppStorage("customSoundPath")
     var customSoundPath: String = ""
 
-    // MARK: - Notification content
+    // MARK: - Notification enrichment (user-friendly toggles)
 
-    @AppStorage("notificationTitle")
-    var notificationTitle: String = L10n.defaultTitle
+    /// Show the project folder name in notifications.
+    @AppStorage("showProjectNameInNotif")
+    var showProjectNameInNotif: Bool = true
 
-    @AppStorage("stopSubtitleTemplate")
-    var stopSubtitleTemplate: String = L10n.defaultStopSubtitle
+    /// Show the current timestamp in notifications.
+    @AppStorage("showTimestampInNotif")
+    var showTimestampInNotif: Bool = true
 
-    @AppStorage("stopMessageTemplate")
-    var stopMessageTemplate: String = L10n.defaultStopMessage
-
-    @AppStorage("notificationSubtitleTemplate")
-    var notificationSubtitleTemplate: String = L10n.defaultNotifSubtitle
-
-    @AppStorage("notificationMessageTemplate")
-    var notificationMessageTemplate: String = L10n.defaultNotifMessage
+    /// Use Claude Code's own message (when available) as the notification body.
+    @AppStorage("useClaudeMessageInNotif")
+    var useClaudeMessageInNotif: Bool = true
 
     // MARK: - Behavior
 
@@ -70,8 +61,6 @@ final class SettingsStore: ObservableObject {
 
     // MARK: - Computed
 
-    /// Resolve the sound name for an event.
-    /// Returns a system sound name (without .aiff), or "__custom__" if a custom file is set.
     func soundName(for event: EventType) -> String {
         switch event {
         case .stop: return soundForStop
@@ -79,17 +68,16 @@ final class SettingsStore: ObservableObject {
         }
     }
 
-    func subtitleTemplate(for event: EventType) -> String {
-        switch event {
-        case .stop: return stopSubtitleTemplate
-        case .notification: return notificationSubtitleTemplate
-        }
+    /// Default title based on locale
+    var effectiveTitle: String {
+        L10n.defaultTitle
     }
 
-    func messageTemplate(for event: EventType) -> String {
+    /// Default subtitle for an event based on locale
+    func effectiveSubtitle(for event: EventType) -> String {
         switch event {
-        case .stop: return stopMessageTemplate
-        case .notification: return notificationMessageTemplate
+        case .stop: return L10n.defaultStopSubtitle
+        case .notification: return L10n.defaultNotifSubtitle
         }
     }
 

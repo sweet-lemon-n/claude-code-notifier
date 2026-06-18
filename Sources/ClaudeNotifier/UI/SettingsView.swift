@@ -14,7 +14,7 @@ struct SettingsView: View {
                 .tabItem {
                     Label(L10n.tabSounds, systemImage: "speaker.wave.2")
                 }
-            MessagesTab(settings: settings)
+            NotificationsTab(settings: settings)
                 .tabItem {
                     Label(L10n.tabMessages, systemImage: "text.bubble")
                 }
@@ -77,38 +77,56 @@ struct SoundsTab: View {
     }
 }
 
-// MARK: - Messages Tab
+// MARK: - Notifications Tab
 
-struct MessagesTab: View {
+struct NotificationsTab: View {
     @ObservedObject var settings: SettingsStore
 
     var body: some View {
         Form {
             Section {
-                TextField(L10n.notificationTitle, text: $settings.notificationTitle)
-            } header: {
-                Text(L10n.commonSection)
-            }
+                Toggle(isOn: $settings.showProjectNameInNotif) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(isCN ? "显示项目名称" : "Show project name")
+                        Text(isCN ? "通知中展示当前项目文件夹名"
+                             : "Include the project folder name in notifications")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
 
-            Section {
-                TextField(L10n.subtitleLabel, text: $settings.stopSubtitleTemplate)
-                TextField(L10n.messageLabel, text: $settings.stopMessageTemplate)
+                Toggle(isOn: $settings.showTimestampInNotif) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(isCN ? "显示时间戳" : "Show timestamp")
+                        Text(isCN ? "通知中展示当前时间"
+                             : "Include the current time in notifications")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+
+                Toggle(isOn: $settings.useClaudeMessageInNotif) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(isCN ? "显示 Claude 的原话" : "Show Claude's message")
+                        Text(isCN ? "当 Claude 需要确认时,用它的原文作为通知内容"
+                             : "Use Claude's own words when it needs confirmation")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
             } header: {
-                Text(L10n.stopSection)
+                Text(isCN ? "通知内容" : "Notification Content")
             } footer: {
-                Text(L10n.templateFooter)
-            }
-
-            Section {
-                TextField(L10n.subtitleLabel, text: $settings.notificationSubtitleTemplate)
-                TextField(L10n.messageLabel, text: $settings.notificationMessageTemplate)
-            } header: {
-                Text(L10n.notifSection)
+                Text(isCN
+                     ? "开启后通知内容会自动变化。关闭全部选项时使用简洁的默认文案。"
+                     : "When enabled, notification content varies dynamically. Disable all for simple default text.")
             }
         }
         .formStyle(.grouped)
         .padding()
     }
+
+    private var isCN: Bool { LocaleManager.isChinese }
 }
 
 // MARK: - About Tab

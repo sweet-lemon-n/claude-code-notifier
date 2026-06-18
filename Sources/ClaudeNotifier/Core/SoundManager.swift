@@ -7,6 +7,9 @@ final class SoundManager {
     /// Cached sounds keyed by name
     private var cache: [String: NSSound] = [:]
 
+    /// Hold strong references to currently playing sounds so ARC doesn't kill them mid-playback.
+    private var activePlayers: [NSSound] = []
+
     /// Ordered list of system sound names found in /System/Library/Sounds (no extension)
     static let systemSounds: [String] = {
         let url = URL(fileURLWithPath: "/System/Library/Sounds")
@@ -21,7 +24,6 @@ final class SoundManager {
 
     init(settings: SettingsStore) {
         self.settings = settings
-        // Preload all system sounds
         for name in Self.systemSounds {
             if let s = NSSound(named: .init(name)) {
                 cache[name] = s
@@ -30,36 +32,48 @@ final class SoundManager {
     }
 
     /// Play the sound configured for the given event.
-    /// Does nothing if muted or sound is disabled.
     @MainActor func play(for event: EventType) {
         guard settings.enableSound, !settings.muted else { return }
-
         let name = settings.soundName(for: event)
+        playSound(name: name)
+    }
 
-        // Custom file path takes precedence
-        if name == "__custom__",
-           !settings.customSoundPath.isEmpty,
-           let custom = NSSound(contentsOfFile: settings.customSoundPath, byReference: false) {
-            custom.play()
+    /// Preview a sound by name — keeps a strong reference so it plays to completion.
+    @MainActor func preview(name: String) {
+        playSound(name: name)
+    }
+
+    // MARK: - Private
+
+    @MainActor private func playSound(name: String) {
+        // Custom file
+        if name == "__custom__", !settings.customSoundPath.isEmpty {
+            if let s = NSSound(contentsOfFile: settings.customSoundPath, byReference: false) {
+                s.delegate = playerDelegate
+                activePlayers.append(s)
+                s.play()
+            }
             return
         }
 
-        // Play from cache (clone avoids concurrent playback issues)
+        // Cached system sound: clone so concurrent calls don't cut each other off
         if let cached = cache[name], let clone = cached.copy() as? NSSound {
+            clone.delegate = playerDelegate
+            activePlayers.append(clone)
             clone.play()
-        } else {
-            NSSound(named: .init(name))?.play()
+        } else if let s = NSSound(named: .init(name)) {
+            s.delegate = playerDelegate
+            activePlayers.append(s)
+            s.play()
         }
     }
 
-    /// Preview a sound by name (e.g. from the settings picker).
-    @MainActor func preview(name: String) {
-        if name == "__custom__", !settings.customSoundPath.isEmpty {
-            NSSound(contentsOfFile: settings.customSoundPath, byReference: false)?.play()
-        } else if let cached = cache[name], let clone = cached.copy() as? NSSound {
-            clone.play()
-        } else {
-            NSSound(named: .init(name))?.play()
-        }
+    // Small helper to satisfy NSSoundDelegate (requires NSObject)
+    private let playerDelegate = SoundDelegateHelper()
+}
+
+private final class SoundDelegateHelper: NSObject, NSSoundDelegate {
+    func sound(_ sound: NSSound, didFinishPlaying finished: Bool) {
+        // The SoundManager holds strong refs in activePlayers; nothing to do here.
     }
 }

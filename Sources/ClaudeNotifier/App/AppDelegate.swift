@@ -97,21 +97,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         popover = NSPopover()
         popover.contentSize = NSSize(width: 270, height: 320)
         popover.behavior = .transient
-        popover.contentViewController = NSHostingController(rootView: menuView)
+        popover.animates = false
+        // Use a hosting controller that clips to the popover's bounds
+        let hostingVC = NSHostingController(rootView: menuView)
+        hostingVC.view.translatesAutoresizingMaskIntoConstraints = false
+        popover.contentViewController = hostingVC
     }
 
     @objc private func togglePopover() {
-        guard let button = statusItem?.button else { return }
+        guard let button = statusItem?.button, let window = button.window else { return }
 
         if popover.isShown {
             popover.performClose(nil)
             eventMonitor = nil
         } else {
-            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .maxY)
+            // Use a taller rect so the popover arrow touches the menu bar
+            let anchor = NSRect(x: button.bounds.midX - 1,
+                                y: button.bounds.minY,
+                                width: 2, height: 1)
+            popover.show(relativeTo: anchor, of: button, preferredEdge: .maxY)
             // Close when clicking outside
             eventMonitor = NSEvent.addGlobalMonitorForEvents(
                 matching: [.leftMouseDown, .rightMouseDown]
-            ) { [weak self] event in
+            ) { [weak self] _ in
                 if self?.popover.isShown == true {
                     self?.popover.performClose(nil)
                     self?.eventMonitor = nil

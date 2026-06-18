@@ -19,3 +19,4 @@ DerivedData/
 
 # Local Claude Code config (per-user)
 .claude/
+vscode/

@@ -37,13 +37,17 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate, Obs
     // MARK: - Send
 
     @MainActor func send(eventType: EventType, payload: HookPayload) {
-        let content = UNMutableNotificationContent()
-        content.title = settings.notificationTitle
-        content.subtitle = settings.subtitleTemplate(for: eventType)
-        content.body = formatMessage(
-            template: settings.messageTemplate(for: eventType),
-            payload: payload
+        // Build smart content from hook data + user preferences
+        let built = NotificationContentBuilder.build(
+            eventType: eventType,
+            payload: payload,
+            settings: settings
         )
+
+        let content = UNMutableNotificationContent()
+        content.title = built.title
+        content.subtitle = built.subtitle
+        content.body = built.body
         content.sound = settings.enableSound && !settings.muted
             ? notificationSound(for: eventType)
             : nil
@@ -61,7 +65,7 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate, Obs
         let request = UNNotificationRequest(
             identifier: UUID().uuidString,
             content: content,
-            trigger: nil  // deliver immediately
+            trigger: nil
         )
 
         pending[request.identifier] = payload.cwd
@@ -71,7 +75,6 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate, Obs
                 print("[ClaudeNotifier] Failed to deliver: \(error.localizedDescription)")
                 return
             }
-            // Record in history
             DispatchQueue.main.async {
                 self?.record(eventType: eventType,
                              title: content.title,
@@ -121,19 +124,6 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate, Obs
     }
 
     // MARK: - Private helpers
-
-    private func formatMessage(template: String, payload: HookPayload) -> String {
-        var result = template
-        if let msg = payload.message, !msg.isEmpty {
-            result = msg
-        }
-        if let cwd = payload.cwd {
-            let name = (cwd as NSString).lastPathComponent
-            result = result.replacingOccurrences(of: "{project}", with: name)
-            result = result.replacingOccurrences(of: "{path}", with: cwd)
-        }
-        return result
-    }
 
     @MainActor private func notificationSound(for event: EventType) -> UNNotificationSound? {
         let name = settings.soundName(for: event)
