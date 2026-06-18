@@ -14,7 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // UI
     private var statusItem: NSStatusItem!
-    private var popover: NSPopover!
+    private var popupWindow: NSPanel?
     private var settingsWindow: NSWindow?
     private var eventMonitor: Any?
     private var menuBarView: MenuBarView?
@@ -94,36 +94,71 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         self.menuBarView = menuView
 
-        popover = NSPopover()
-        popover.contentSize = NSSize(width: 270, height: 320)
-        popover.behavior = .transient
-        popover.animates = false
-        // Use a hosting controller that clips to the popover's bounds
-        let hostingVC = NSHostingController(rootView: menuView)
-        hostingVC.view.translatesAutoresizingMaskIntoConstraints = false
-        popover.contentViewController = hostingVC
     }
 
     @objc private func togglePopover() {
-        guard let button = statusItem?.button, let window = button.window else { return }
+        guard let button = statusItem?.button else { return }
 
-        if popover.isShown {
-            popover.performClose(nil)
+        if let popup = popupWindow, popup.isVisible {
+            popup.close()
+            popupWindow = nil
             eventMonitor = nil
         } else {
-            // Use a taller rect so the popover arrow touches the menu bar
-            let anchor = NSRect(x: button.bounds.midX - 1,
-                                y: button.bounds.minY,
-                                width: 2, height: 1)
-            popover.show(relativeTo: anchor, of: button, preferredEdge: .maxY)
-            // Close when clicking outside
-            eventMonitor = NSEvent.addGlobalMonitorForEvents(
-                matching: [.leftMouseDown, .rightMouseDown]
-            ) { [weak self] _ in
-                if self?.popover.isShown == true {
-                    self?.popover.performClose(nil)
-                    self?.eventMonitor = nil
-                }
+            showPopup(relativeTo: button)
+        }
+    }
+
+    private func showPopup(relativeTo button: NSStatusBarButton) {
+        // Convert the button's frame to screen coordinates.
+        guard let buttonWindow = button.window else { return }
+        let buttonScreenFrame = buttonWindow.convertToScreen(button.frame)
+
+        let panelWidth: CGFloat = 270
+        let panelHeight: CGFloat = 320
+        let gap: CGFloat = 2  // small gap below menu bar
+
+        // Center the panel horizontally under the button
+        let x = buttonScreenFrame.midX - panelWidth / 2
+        let y = buttonScreenFrame.minY - panelHeight - gap
+
+        // Clamp to screen bounds
+        let screen = buttonWindow.screen ?? NSScreen.main ?? NSScreen.screens.first!
+        let screenFrame = screen.visibleFrame
+        let clampedX = max(screenFrame.minX + 8,
+                           min(x, screenFrame.maxX - panelWidth - 8))
+        let clampedY = max(screenFrame.minY,
+                           min(y, screenFrame.maxY - panelHeight))
+
+        let contentRect = NSRect(x: clampedX, y: clampedY,
+                                  width: panelWidth, height: panelHeight)
+
+        let panel = NSPanel(
+            contentRect: contentRect,
+            styleMask: [.borderless, NSWindow.StyleMask.nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+        panel.isOpaque = false
+        panel.backgroundColor = NSColor.clear
+        panel.hasShadow = true
+        panel.level = NSWindow.Level.popUpMenu
+        panel.collectionBehavior = [NSWindow.CollectionBehavior.transient,
+                                     NSWindow.CollectionBehavior.ignoresCycle]
+        panel.isReleasedWhenClosed = false
+        panel.contentView = NSHostingView(rootView: menuBarView!)
+
+        popupWindow = panel
+        panel.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+
+        // Dismiss on click outside (global event monitor)
+        eventMonitor = NSEvent.addGlobalMonitorForEvents(
+            matching: [.leftMouseDown, .rightMouseDown]
+        ) { [weak self] _ in
+            if let panel = self?.popupWindow, panel.isVisible {
+                panel.close()
+                self?.popupWindow = nil
+                self?.eventMonitor = nil
             }
         }
     }
