@@ -61,41 +61,26 @@ print(json.dumps(out))
     fi
 fi
 
-# ---- fallback: direct osascript notification (app not running) ----------------
-TITLE="Claude Code"
-SUBTITLE=""
-MESSAGE=""
-SOUND="Glass"
-
-case "$EVENT" in
-    stop)
-        SUBTITLE="Task Complete"
-        MESSAGE="Claude is ready — awaiting your next instruction"
-        SOUND="Glass"
-        ;;
-    notification)
-        SUBTITLE="Needs Your Confirmation"
-        if [ -n "$MSG" ]; then
-            MESSAGE="$MSG"
-        else
-            MESSAGE="Claude is waiting for your input"
+# ---- fallback: app not running → launch it and retry -------------------------
+APP="/Applications/ClaudeNotifier.app"
+if [ -d "$APP" ]; then
+    open -a "$APP" --hide 2>/dev/null || true
+    # Give the app a moment to bind its server
+    for i in 1 2 3 4 5; do
+        sleep 0.5
+        if [ -f "$PORT_FILE" ]; then
+            PORT=$(cat "$PORT_FILE" 2>/dev/null || true)
+            if [ -n "$PORT" ]; then
+                curl -s -X POST "http://127.0.0.1:${PORT}/event" \
+                    -H "Content-Type: application/json" \
+                    -d "$SEND_JSON" \
+                    --max-time 2 >/dev/null 2>&1 && exit 0
+            fi
         fi
-        SOUND="Ping"
-        ;;
-esac
-
-escape() {
-    printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
-}
-
-SOUND_FILE="/System/Library/Sounds/${SOUND}.aiff"
-if [ -f "$SOUND_FILE" ]; then
-    /usr/bin/afplay "$SOUND_FILE" >/dev/null 2>&1 &
+    done
 fi
 
-TITLE_E=$(escape "$TITLE")
-SUBTITLE_E=$(escape "$SUBTITLE")
-MESSAGE_E=$(escape "$MESSAGE")
-/usr/bin/osascript -e "display notification \"${MESSAGE_E}\" with title \"${TITLE_E}\" subtitle \"${SUBTITLE_E}\" sound name \"${SOUND}\"" >/dev/null 2>&1 || true
+# If we still can't reach the app, play only a sound as last resort
+/usr/bin/afplay /System/Library/Sounds/Glass.aiff >/dev/null 2>&1 &
 
 exit 0
