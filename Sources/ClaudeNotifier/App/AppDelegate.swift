@@ -35,10 +35,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.vscodeManager.activateProject(path: projectPath)
         }
 
-        // 3. Request notification permission
-        notificationManager.requestPermission()
-
-        // 4. Setup menu bar
+        // 3. Setup menu bar
         setupMenuBar()
 
         // 5. Start IPC server
