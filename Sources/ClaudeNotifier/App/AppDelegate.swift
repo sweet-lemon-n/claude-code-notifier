@@ -31,9 +31,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         notificationManager = NotificationManager(settings: settingsStore)
 
         // Wire notification click → activate VSCode
-        notificationManager.onNotificationClicked = { [weak self] projectPath in
-            self?.vscodeManager.activateProject(path: projectPath)
+        notificationManager.onNotificationClicked = { [weak self] path in
+            self?.vscodeManager.activateProject(path: path)
         }
+
+        // Request notification permission (now reliable with proper bundle ID)
+        notificationManager.requestPermission()
 
         // 3. Setup menu bar
         setupMenuBar()
@@ -86,6 +89,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 DispatchQueue.main.async {
                     self?.settingsStore.muted.toggle()
                 }
+            },
+            onOpenProject: { [weak self] path in
+                self?.vscodeManager.activateProject(path: path)
             },
             onQuit: { [weak self] in self?.terminate() }
         )

@@ -6,8 +6,10 @@
 	<string>en</string>
 	<key>CFBundleExecutable</key>
 	<string>ClaudeNotifier</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
-	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<string>com.sweetlemon.ClaudeNotifier</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>

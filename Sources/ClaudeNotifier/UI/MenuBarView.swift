@@ -7,6 +7,7 @@ struct MenuBarView: View {
 
     var onOpenSettings: () -> Void
     var onToggleMute: () -> Void
+    var onOpenProject: (String) -> Void
     var onQuit: () -> Void
 
     var body: some View {
@@ -60,21 +61,35 @@ struct MenuBarView: View {
                     ScrollView {
                         VStack(spacing: 2) {
                             ForEach(notificationManager.recentNotifications.prefix(5)) { record in
-                                HStack(spacing: 6) {
-                                    Image(systemName: record.eventType.iconName)
-                                        .font(.system(size: 11))
-                                        .foregroundColor(.accentColor)
-                                    VStack(alignment: .leading, spacing: 1) {
-                                        Text(record.message)
-                                            .font(.system(size: 11))
-                                            .lineLimit(1)
-                                        Text(record.time, style: .relative)
-                                            .font(.system(size: 9))
-                                            .foregroundColor(.secondary)
+                                Button {
+                                    if let path = record.projectPath, !path.isEmpty {
+                                        onOpenProject(path)
                                     }
+                                } label: {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: record.eventType.iconName)
+                                            .font(.system(size: 11))
+                                            .foregroundColor(.accentColor)
+                                        VStack(alignment: .leading, spacing: 1) {
+                                            Text(record.message)
+                                                .font(.system(size: 11))
+                                                .lineLimit(1)
+                                            Text(record.time, style: .relative)
+                                                .font(.system(size: 9))
+                                                .foregroundColor(.secondary)
+                                        }
+                                        Spacer()
+                                        if record.projectPath != nil {
+                                            Image(systemName: "arrow.up.forward.app")
+                                                .font(.system(size: 9))
+                                                .foregroundColor(.secondary)
+                                        }
+                                    }
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 3)
+                                    .contentShape(Rectangle())
                                 }
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 3)
+                                .buttonStyle(.plain)
                             }
                         }
                     }

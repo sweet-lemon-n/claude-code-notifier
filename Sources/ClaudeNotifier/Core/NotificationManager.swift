@@ -1,29 +1,48 @@
+import UserNotifications
 import AppKit
 
-/// Manages notification delivery and click handling.
-/// Uses NSUserNotificationCenter — reliable, no permission dialog needed,
-/// supports click actions, works with LSUIElement apps.
-///
-/// UNUserNotificationCenter is NOT used because LSUIElement menu-bar apps
-/// cannot reliably obtain notification permission from macOS.
-final class NotificationManager: NSObject, NSUserNotificationCenterDelegate, ObservableObject {
+/// Manages notification delivery using UNUserNotificationCenter.
+/// Now that the app has a valid bundle identifier (com.sweetlemon.ClaudeNotifier)
+/// and CFBundleIconFile, UN works reliably with our app icon.
+final class NotificationManager: NSObject, ObservableObject {
     unowned let settings: SettingsStore
 
+    /// Called when user clicks a notification — receives the project path.
     var onNotificationClicked: ((String) -> Void)?
 
-    /// Maps notification identifier → project path for click routing
+    /// Map notification request ID → project path for click routing
     private var pending: [String: String] = [:]
 
     @Published var recentNotifications: [NotificationRecord] = []
+    @Published var permissionGranted: Bool = false
     private let maxRecent = 10
 
     init(settings: SettingsStore) {
         self.settings = settings
         super.init()
-        NSUserNotificationCenter.default.delegate = self
+        UNUserNotificationCenter.current().delegate = self
     }
 
-    // No permission request needed — NSUserNotificationCenter works without it.
+    // MARK: - Permission
+
+    func requestPermission() {
+        let center = UNUserNotificationCenter.current()
+        center.getNotificationSettings { [weak self] s in
+            if s.authorizationStatus == .authorized
+                || s.authorizationStatus == .provisional {
+                DispatchQueue.main.async {
+                    self?.permissionGranted = true
+                }
+                return
+            }
+            // Not yet authorized — request it.
+            center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
+                DispatchQueue.main.async {
+                    self?.permissionGranted = granted
+                }
+            }
+        }
+    }
 
     // MARK: - Send
 
@@ -32,51 +51,32 @@ final class NotificationManager: NSObject, NSUserNotificationCenterDelegate, Obs
             eventType: eventType, payload: payload, settings: settings
         )
 
-        let note = NSUserNotification()
-        note.identifier = UUID().uuidString
-        note.title = built.title
-        note.subtitle = built.subtitle
-        note.informativeText = built.body
-        // Sound is handled by SoundManager separately — no soundName here
-        note.hasActionButton = true
-        note.actionButtonTitle = LocaleManager.isChinese ? "打开项目" : "Open Project"
-        note.otherButtonTitle = LocaleManager.isChinese ? "关闭" : "Close"
-        note.userInfo = ["cwd": payload.cwd ?? NSNull()]
-
-        pending[note.identifier!] = payload.cwd
-
-        NSUserNotificationCenter.default.deliver(note)
-
+        // Always record to history (menu bar shows these)
         record(eventType: eventType,
                title: built.title,
                message: built.body,
                projectPath: payload.cwd)
-    }
 
-    // MARK: - NSUserNotificationCenterDelegate
-
-    func userNotificationCenter(
-        _ center: NSUserNotificationCenter,
-        didActivate notification: NSUserNotification
-    ) {
-        guard let identifier = notification.identifier,
-              let projectPath = pending[identifier] else { return }
-
-        switch notification.activationType {
-        case .actionButtonClicked, .contentsClicked:
-            onNotificationClicked?(projectPath)
-        default:
-            break
+        // Build UN content
+        let content = UNMutableNotificationContent()
+        content.title = built.title
+        if !built.subtitle.isEmpty {
+            content.subtitle = built.subtitle
         }
-        pending.removeValue(forKey: identifier)
-    }
+        content.body = built.body
+        content.sound = nil  // Sound handled by SoundManager
+        content.interruptionLevel = .active
+        content.categoryIdentifier = "CLAUDE_NOTIFIER"
 
-    /// Always show even when app is active (menu bar app is always "active").
-    func userNotificationCenter(
-        _ center: NSUserNotificationCenter,
-        shouldPresent notification: NSUserNotification
-    ) -> Bool {
-        true
+        let id = UUID().uuidString
+        let request = UNNotificationRequest(identifier: id, content: content, trigger: nil)
+        if let path = payload.cwd, !path.isEmpty {
+            pending[id] = path
+        }
+
+        UNUserNotificationCenter.current().add(request) { _ in
+            // Even on error, history is recorded above
+        }
     }
 
     // MARK: - History
@@ -90,5 +90,35 @@ final class NotificationManager: NSObject, NSUserNotificationCenterDelegate, Obs
         if recentNotifications.count > maxRecent {
             recentNotifications = Array(recentNotifications.prefix(maxRecent))
         }
+    }
+}
+
+// MARK: - UNUserNotificationCenterDelegate
+
+extension NotificationManager: UNUserNotificationCenterDelegate {
+
+    /// Always show the banner even when our app is "active" (menu bar always is).
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        completionHandler([.banner, .list])
+    }
+
+    /// User clicked a notification — open the matching project in VSCode.
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        let id = response.notification.request.identifier
+        if let path = pending[id] {
+            DispatchQueue.main.async { [weak self] in
+                self?.onNotificationClicked?(path)
+            }
+            pending.removeValue(forKey: id)
+        }
+        completionHandler()
     }
 }
