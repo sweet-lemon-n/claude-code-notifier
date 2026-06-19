@@ -46,6 +46,7 @@ fi
 
 /usr/bin/python3 - "$SETTINGS_FILE" "$NOTIFY_SH" <<'PYEOF'
 import json, sys
+import re
 
 settings_file, notify_sh = sys.argv[1], sys.argv[2]
 
@@ -60,7 +61,14 @@ if not isinstance(data, dict):
 
 hooks = data.setdefault('hooks', {})
 
-def upsert(event, arg):
+def is_claude_notifier_command(command):
+    if not isinstance(command, str):
+        return False
+    if notify_sh in command:
+        return True
+    return bool(re.search(r'(^|[/"\s])notify\.sh(["\s]|$)', command))
+
+def upsert(event, arg, matcher=None):
     cmd = f'"{notify_sh}" {arg}'
     matchers = hooks.setdefault(event, [])
     new_matchers = []
@@ -69,19 +77,21 @@ def upsert(event, arg):
             continue
         kept = []
         for h in m.get('hooks', []):
-            if isinstance(h, dict) and notify_sh in (h.get('command') or ''):
+            if isinstance(h, dict) and is_claude_notifier_command(h.get('command')):
                 continue
             kept.append(h)
         if kept:
             m['hooks'] = kept
             new_matchers.append(m)
-    if new_matchers:
-        hooks[event] = new_matchers
-    else:
-        hooks[event] = [{'hooks': [{'type': 'command', 'command': cmd}]}]
+    entry = {'hooks': [{'type': 'command', 'command': cmd}]}
+    if matcher:
+        entry['matcher'] = matcher
+    new_matchers.append(entry)
+    hooks[event] = new_matchers
 
 upsert('Stop', 'stop')
-upsert('Notification', 'notification')
+upsert('Notification', 'notification', 'idle_prompt')
+upsert('PermissionRequest', 'permission')
 
 with open(settings_file, 'w', encoding='utf-8') as f:
     json.dump(data, f, indent=2, ensure_ascii=False)

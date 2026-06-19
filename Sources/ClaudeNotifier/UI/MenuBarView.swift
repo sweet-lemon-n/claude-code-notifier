@@ -5,6 +5,7 @@ struct MenuBarView: View {
     @ObservedObject var settings: SettingsStore
     @ObservedObject var notificationManager: NotificationManager
 
+    var onOpenMainWindow: () -> Void
     var onOpenSettings: () -> Void
     var onToggleMute: () -> Void
     var onOpenProject: (String) -> Void
@@ -14,7 +15,7 @@ struct MenuBarView: View {
         VStack(spacing: 0) {
             // Header
             HStack {
-                Image(systemName: "bell.badge.fill")
+                Image(systemName: "bolt.bell.fill")
                     .font(.title3)
                 Text(L10n.menuTitle)
                     .font(.headline)
@@ -67,9 +68,13 @@ struct MenuBarView: View {
                                     }
                                 } label: {
                                     HStack(spacing: 6) {
-                                        Image(systemName: record.eventType.iconName)
+                                        Image(systemName: record.eventType == .notification
+                                              ? "exclamationmark.triangle.fill"
+                                              : "checkmark.circle.fill")
                                             .font(.system(size: 11))
-                                            .foregroundColor(.accentColor)
+                                            .foregroundColor(record.eventType == .notification
+                                                             ? .orange
+                                                             : .green)
                                         VStack(alignment: .leading, spacing: 1) {
                                             Text(record.message)
                                                 .font(.system(size: 11))
@@ -112,7 +117,15 @@ struct MenuBarView: View {
                 Divider()
             }
 
-            // Settings
+            Button(LocaleManager.isChinese ? "打开主窗口" : "Open Window") {
+                onOpenMainWindow()
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+
+            Divider()
+
             Button(L10n.settingsButton) {
                 onOpenSettings()
             }

@@ -7,6 +7,9 @@ set -u
 
 EVENT="${1:-stop}"
 PORT_FILE="$HOME/.claude/claude-notifier-port"
+LOG_FILE="$HOME/.claude/claude-notifier-latency.log"
+CURL_CONNECT_TIMEOUT="0.1"
+CURL_MAX_TIME="0.35"
 
 # ---- read hook JSON from stdin ------------------------------------------------
 PAYLOAD=""
@@ -14,49 +17,113 @@ if [ ! -t 0 ]; then
     PAYLOAD=$(cat 2>/dev/null || true)
 fi
 
-# ---- extract cwd -------------------------------------------------------------
-CWD=""
-if [ -n "$PAYLOAD" ]; then
-    CWD=$(/usr/bin/python3 -c "
-import sys,json
-try:
-    d = json.loads(sys.stdin.read())
-    print(d.get('cwd',''))
-except Exception:
-    pass
-" <<< "$PAYLOAD" 2>/dev/null || true)
-fi
-[ -z "$CWD" ] && CWD="${PWD:-}"
+# ---- build outbound JSON safely ---------------------------------------------
+SEND_JSON=$(CLAUDE_NOTIFIER_PAYLOAD="$PAYLOAD" /usr/bin/python3 - "$EVENT" "${PWD:-}" <<'PYEOF' 2>/dev/null || true
+import json, os, sys, time
 
-# ---- extract message for Notification events ---------------------------------
-MSG=""
-if [ -n "$PAYLOAD" ] && [ "$EVENT" = "notification" ]; then
-    MSG=$(/usr/bin/python3 -c "
-import sys,json
+event, fallback_cwd = sys.argv[1], sys.argv[2]
+raw = os.environ.get("CLAUDE_NOTIFIER_PAYLOAD", "")
 try:
-    d = json.loads(sys.stdin.read())
-    print(d.get('message',''))
+    out = json.loads(raw) if raw.strip() else {}
+    if not isinstance(out, dict):
+        out = {}
 except Exception:
-    pass
-" <<< "$PAYLOAD" 2>/dev/null || true)
+    out = {}
+
+def clean(value, limit=180):
+    if value is None:
+        return ""
+    text = " ".join(str(value).replace("\r", "\n").split())
+    return text if len(text) <= limit else text[:limit] + "..."
+
+def first_dict(*values):
+    for value in values:
+        if isinstance(value, dict):
+            return value
+    return {}
+
+def nested(data, *keys):
+    current = data
+    for key in keys:
+        if not isinstance(current, dict):
+            return None
+        current = current.get(key)
+    return current
+
+def describe_tool(data):
+    tool_obj = first_dict(data.get("tool"), data.get("tool_use"), data.get("toolUse"))
+    tool_name = (
+        data.get("tool_name") or data.get("toolName") or
+        tool_obj.get("name") or nested(data, "permission", "tool_name") or
+        nested(data, "permission", "toolName") or "Tool"
+    )
+    tool_input = first_dict(
+        data.get("tool_input"),
+        data.get("toolInput"),
+        data.get("input"),
+        tool_obj.get("input"),
+        nested(data, "permission", "tool_input"),
+        nested(data, "permission", "toolInput"),
+        nested(data, "permission", "input")
+    )
+
+    description = clean(
+        tool_input.get("description") or data.get("description") or data.get("reason")
+    )
+    command = clean(
+        tool_input.get("command") or data.get("command"),
+        220
+    )
+    file_path = clean(
+        tool_input.get("file_path") or tool_input.get("filePath") or
+        tool_input.get("path") or data.get("file_path") or data.get("path")
+    )
+    url = clean(tool_input.get("url") or data.get("url"))
+
+    if description and command:
+        return f"{tool_name}: {description} — {command}"
+    if description:
+        return f"{tool_name}: {description}"
+    if command:
+        return f"{tool_name}: {command}"
+    if file_path:
+        return f"{tool_name}: {file_path}"
+    if url:
+        return f"{tool_name}: {url}"
+    return clean(tool_name)
+
+source_event = event
+if event in ("permission", "permission_request", "pretool"):
+    out["event"] = "notification"
+else:
+    out["event"] = event
+
+out["cwd"] = out.get("cwd") or fallback_cwd
+out["notifier_source_event"] = source_event
+action_summary = describe_tool(out)
+if action_summary and source_event in ("permission", "permission_request", "pretool"):
+    out["action_summary"] = action_summary
+    out["message"] = action_summary
+out["notifier_script_received_at"] = time.time()
+print(json.dumps(out, ensure_ascii=False))
+PYEOF
+)
+
+printf '%s notify.sh received event=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$EVENT" >> "$LOG_FILE" 2>/dev/null || true
+if [ "$EVENT" = "permission" ] || [ "$EVENT" = "permission_request" ] || [ "$EVENT" = "pretool" ]; then
+    printf '%s permission payload=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$SEND_JSON" >> "$LOG_FILE" 2>/dev/null || true
 fi
 
 # ---- try to reach the running app --------------------------------------------
 if [ -f "$PORT_FILE" ]; then
     PORT=$(cat "$PORT_FILE" 2>/dev/null || true)
     if [ -n "$PORT" ]; then
-        SEND_JSON=$(/usr/bin/python3 -c "
-import json
-out = {'event':'$EVENT','cwd':'$CWD'}
-if '$MSG': out['message'] = '$MSG'
-print(json.dumps(out))
-" 2>/dev/null || true)
-
         if [ -n "$SEND_JSON" ]; then
             curl -s -X POST "http://127.0.0.1:${PORT}/event" \
                 -H "Content-Type: application/json" \
                 -d "$SEND_JSON" \
-                --max-time 2 >/dev/null 2>&1 && exit 0
+                --connect-timeout "$CURL_CONNECT_TIMEOUT" \
+                --max-time "$CURL_MAX_TIME" >/dev/null 2>&1 && exit 0
         fi
     fi
 fi
@@ -66,15 +133,16 @@ APP="/Applications/ClaudeNotifier.app"
 if [ -d "$APP" ]; then
     open -a "$APP" --hide 2>/dev/null || true
     # Give the app a moment to bind its server
-    for i in 1 2 3 4 5; do
-        sleep 0.5
+    for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
+        sleep 0.2
         if [ -f "$PORT_FILE" ]; then
             PORT=$(cat "$PORT_FILE" 2>/dev/null || true)
             if [ -n "$PORT" ]; then
                 curl -s -X POST "http://127.0.0.1:${PORT}/event" \
                     -H "Content-Type: application/json" \
                     -d "$SEND_JSON" \
-                    --max-time 2 >/dev/null 2>&1 && exit 0
+                    --connect-timeout "$CURL_CONNECT_TIMEOUT" \
+                    --max-time "$CURL_MAX_TIME" >/dev/null 2>&1 && exit 0
             fi
         fi
     done

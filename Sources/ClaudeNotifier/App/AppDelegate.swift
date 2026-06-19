@@ -3,7 +3,7 @@ import SwiftUI
 
 /// Central app delegate — initializes all managers, sets up the menu bar,
 /// and routes incoming IPC events to notifications + sounds.
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     // Managers
     private var settingsStore: SettingsStore!
@@ -15,6 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // UI
     private var statusItem: NSStatusItem!
     private var popupWindow: NSPanel?
+    private var mainWindow: NSWindow?
     private var settingsWindow: NSWindow?
     private var eventMonitor: Any?
     private var menuBarView: MenuBarView?
@@ -35,11 +36,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.vscodeManager.activateProject(path: path)
         }
 
-        // Request notification permission (now reliable with proper bundle ID)
+        // Request notification permission
         notificationManager.requestPermission()
 
         // 3. Setup menu bar
         setupMenuBar()
+
+        // 4. Show the foreground app window. Closing it keeps the menu bar
+        //    service running in the background.
+        openMainWindow()
+        settingsStore.hasCompletedSetup = true
 
         // 5. Start IPC server
         ipcServer = IPCServer { [weak self] eventType, payload in
@@ -50,6 +56,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         ipcServer?.stop()
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication,
+                                       hasVisibleWindows flag: Bool) -> Bool {
+        openMainWindow()
+        return true
     }
 
     // MARK: - Event handling
@@ -84,6 +96,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let menuView = MenuBarView(
             settings: settingsStore,
             notificationManager: notificationManager,
+            onOpenMainWindow: { [weak self] in self?.openMainWindow() },
             onOpenSettings: { [weak self] in self?.openSettings() },
             onToggleMute: { [weak self] in
                 DispatchQueue.main.async {
@@ -188,8 +201,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Settings Window
 
+    func openMainWindow() {
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+
+        if let existing = mainWindow {
+            existing.makeKeyAndOrderFront(nil)
+            return
+        }
+
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 820, height: 560),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = L10n.menuTitle
+        window.contentView = NSHostingView(
+            rootView: MainWindowView(
+                settings: settingsStore,
+                notificationManager: notificationManager,
+                onOpenProject: { [weak self] path in
+                    self?.vscodeManager.activateProject(path: path)
+                },
+                onOpenSettings: { [weak self] in self?.openSettings() },
+                onToggleMute: { [weak self] in
+                    DispatchQueue.main.async {
+                        self?.settingsStore.muted.toggle()
+                    }
+                }
+            )
+        )
+        window.center()
+        window.isReleasedWhenClosed = false
+        window.delegate = self
+        window.makeKeyAndOrderFront(nil)
+        mainWindow = window
+    }
+
     func openSettings() {
-        // Activate app first so the window gets proper focus
         NSApp.activate(ignoringOtherApps: true)
 
         if let existing = settingsWindow {
@@ -209,9 +259,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         window.center()
         window.isReleasedWhenClosed = false
+        window.delegate = self
         window.makeKeyAndOrderFront(nil)
 
         self.settingsWindow = window
+    }
+
+    // MARK: - NSWindowDelegate
+
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        if sender === mainWindow {
+            sender.orderOut(nil)
+            return false
+        }
+        return true
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow else { return }
+        if window === settingsWindow {
+            settingsWindow = nil
+        }
     }
 
     // MARK: - Quit

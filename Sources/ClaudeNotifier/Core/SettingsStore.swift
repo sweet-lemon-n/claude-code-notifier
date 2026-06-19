@@ -14,6 +14,14 @@ final class SettingsStore: ObservableObject {
             "soundForStop": "Glass",
             "soundForNotification": "Ping",
             "customSoundPath": "",
+            "showProjectNameInNotif": true,
+            "showTimestampInNotif": true,
+            "useClaudeMessageInNotif": true,
+            "launchAtLogin": false,
+            "showNotificationPreview": true,
+            "enableSound": true,
+            "muted": false,
+            "hasCompletedSetup": false,
         ]
         UserDefaults.standard.register(defaults: defaults)
     }
@@ -58,6 +66,10 @@ final class SettingsStore: ObservableObject {
 
     @AppStorage("muted")
     var muted: Bool = false
+
+    /// First-launch flag: show Dock + settings window, then dismiss to menu bar.
+    @AppStorage("hasCompletedSetup")
+    var hasCompletedSetup: Bool = false
 
     // MARK: - Computed
 

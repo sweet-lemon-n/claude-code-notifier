@@ -42,6 +42,7 @@ if [ -f "$SETTINGS_FILE" ]; then
     NOTIFY_SH="$SCRIPT_DIR/notify.sh"
     /usr/bin/python3 - "$SETTINGS_FILE" "$NOTIFY_SH" <<'PYEOF'
 import json, sys
+import re
 
 settings_file, notify_sh = sys.argv[1], sys.argv[2]
 
@@ -59,7 +60,14 @@ if not isinstance(data, dict):
 hooks = data.get('hooks', {})
 removed = False
 
-for event in ['Stop', 'Notification']:
+def is_claude_notifier_command(command):
+    if not isinstance(command, str):
+        return False
+    if notify_sh in command:
+        return True
+    return bool(re.search(r'(^|[/"\s])notify\.sh(["\s]|$)', command))
+
+for event in ['Stop', 'Notification', 'PermissionRequest']:
     if event not in hooks:
         continue
     matchers = hooks[event]
@@ -69,7 +77,7 @@ for event in ['Stop', 'Notification']:
             continue
         kept = []
         for h in m.get('hooks', []):
-            if isinstance(h, dict) and notify_sh in (h.get('command') or ''):
+            if isinstance(h, dict) and is_claude_notifier_command(h.get('command')):
                 removed = True
                 continue
             kept.append(h)

@@ -1,45 +1,63 @@
 import UserNotifications
 import AppKit
 
-/// Manages notification delivery using UNUserNotificationCenter.
-/// Now that the app has a valid bundle identifier (com.sweetlemon.ClaudeNotifier)
-/// and CFBundleIconFile, UN works reliably with our app icon.
+/// Standard macOS notifications via UNUserNotificationCenter.
 final class NotificationManager: NSObject, ObservableObject {
     unowned let settings: SettingsStore
 
-    /// Called when user clicks a notification — receives the project path.
+    /// Click-to-VSCode callback — receives the project path.
     var onNotificationClicked: ((String) -> Void)?
 
-    /// Map notification request ID → project path for click routing
+    /// Maps notification ID → project path.
     private var pending: [String: String] = [:]
 
     @Published var recentNotifications: [NotificationRecord] = []
-    @Published var permissionGranted: Bool = false
     private let maxRecent = 10
+
+    /// Dedup: skip repeated hook deliveries within this window.
+    private var recentlySent: [String: Date] = [:]
+    private let duplicateWindow: TimeInterval = 5
 
     init(settings: SettingsStore) {
         self.settings = settings
         super.init()
-        UNUserNotificationCenter.current().delegate = self
+
+        let center = UNUserNotificationCenter.current()
+        center.delegate = self
+
+        let confirmAction = UNNotificationAction(
+            identifier: "OPEN_PROJECT",
+            title: LocaleManager.isChinese ? "去确认" : "Review",
+            options: .foreground
+        )
+        let openAction = UNNotificationAction(
+            identifier: "OPEN_PROJECT",
+            title: LocaleManager.isChinese ? "打开项目" : "Open Project",
+            options: .foreground
+        )
+        let confirmationCategory = UNNotificationCategory(
+            identifier: "CLAUDE_NOTIFIER_CONFIRM",
+            actions: [confirmAction],
+            intentIdentifiers: [],
+            options: []
+        )
+        let completionCategory = UNNotificationCategory(
+            identifier: "CLAUDE_NOTIFIER_DONE",
+            actions: [openAction],
+            intentIdentifiers: [],
+            options: []
+        )
+        center.setNotificationCategories([confirmationCategory, completionCategory])
     }
 
-    // MARK: - Permission
-
     func requestPermission() {
-        let center = UNUserNotificationCenter.current()
-        center.getNotificationSettings { [weak self] s in
-            if s.authorizationStatus == .authorized
-                || s.authorizationStatus == .provisional {
-                DispatchQueue.main.async {
-                    self?.permissionGranted = true
-                }
-                return
-            }
-            // Not yet authorized — request it.
-            center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
-                DispatchQueue.main.async {
-                    self?.permissionGranted = granted
-                }
+        UNUserNotificationCenter.current().requestAuthorization(
+            options: [.alert, .sound, .badge]
+        ) { granted, error in
+            if let error {
+                print("[ClaudeNotifier] UN auth error: \(error)")
+            } else {
+                print("[ClaudeNotifier] UN auth granted: \(granted)")
             }
         }
     }
@@ -47,41 +65,70 @@ final class NotificationManager: NSObject, ObservableObject {
     // MARK: - Send
 
     @MainActor func send(eventType: EventType, payload: HookPayload) {
+        let now = Date()
+
+        pruneRecentlySent(now: now)
+        let key = deduplicationKey(eventType: eventType, payload: payload)
+        if let lastTime = recentlySent[key],
+           now.timeIntervalSince(lastTime) < duplicateWindow {
+            return
+        }
+        recentlySent[key] = now
+
+        let summary = TranscriptSummarizer.summarize(path: payload.transcriptPath)
         let built = NotificationContentBuilder.build(
-            eventType: eventType, payload: payload, settings: settings
+            eventType: eventType,
+            payload: payload,
+            settings: settings,
+            summary: summary
         )
 
-        // Always record to history (menu bar shows these)
         record(eventType: eventType,
                title: built.title,
                message: built.body,
                projectPath: payload.cwd)
 
-        // Build UN content
         let content = UNMutableNotificationContent()
         content.title = built.title
-        if !built.subtitle.isEmpty {
-            content.subtitle = built.subtitle
-        }
+        content.subtitle = built.subtitle
         content.body = built.body
-        content.sound = nil  // Sound handled by SoundManager
+        content.sound = .default
+        content.categoryIdentifier = eventType == .notification
+            ? "CLAUDE_NOTIFIER_CONFIRM"
+            : "CLAUDE_NOTIFIER_DONE"
         content.interruptionLevel = .active
-        content.categoryIdentifier = "CLAUDE_NOTIFIER"
+        if eventType == .notification {
+            content.threadIdentifier = "claude-notifier-confirmation"
+        } else {
+            content.threadIdentifier = "claude-notifier-completion"
+        }
+        if let attachment = notificationAttachment(for: eventType) {
+            content.attachments = [attachment]
+        }
 
         let id = UUID().uuidString
-        let request = UNNotificationRequest(identifier: id, content: content, trigger: nil)
         if let path = payload.cwd, !path.isEmpty {
             pending[id] = path
+            content.userInfo = ["cwd": path]
         }
 
-        UNUserNotificationCenter.current().add(request) { _ in
-            // Even on error, history is recorded above
+        let request = UNNotificationRequest(
+            identifier: id, content: content, trigger: nil
+        )
+
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error {
+                print("[ClaudeNotifier] deliver error: \(error)")
+            }
         }
+
+        logLatency(eventType: eventType, payload: payload)
     }
 
     // MARK: - History
 
-    private func record(eventType: EventType, title: String, message: String, projectPath: String?) {
+    private func record(eventType: EventType, title: String,
+                        message: String, projectPath: String?) {
         let record = NotificationRecord(
             eventType: eventType, title: title,
             message: message, projectPath: projectPath
@@ -91,29 +138,74 @@ final class NotificationManager: NSObject, ObservableObject {
             recentNotifications = Array(recentNotifications.prefix(maxRecent))
         }
     }
+
+    private func deduplicationKey(eventType: EventType, payload: HookPayload) -> String {
+        [
+            eventType.rawValue,
+            payload.cwd ?? "",
+            payload.sessionId ?? "",
+            payload.actionSummary ?? "",
+            payload.message ?? ""
+        ].joined(separator: "\u{1f}")
+    }
+
+    private func pruneRecentlySent(now: Date) {
+        recentlySent = recentlySent.filter {
+            now.timeIntervalSince($0.value) < duplicateWindow
+        }
+    }
+
+    private func logLatency(eventType: EventType, payload: HookPayload) {
+        guard let scriptReceived = payload.notifierScriptReceivedAt else { return }
+        let now = Date().timeIntervalSince1970
+        let ipcDelay = max(0, now - scriptReceived)
+        let source = payload.notifierSourceEvent ?? eventType.rawValue
+        let line = "[ClaudeNotifier] \(eventType.rawValue)(source=\(source)) hook-to-app delay: \(String(format: "%.3f", ipcDelay))s"
+        print(line)
+        appendLatencyLog(line)
+    }
+
+    private func appendLatencyLog(_ line: String) {
+        let path = "\(NSHomeDirectory())/.claude/claude-notifier-latency.log"
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        let entry = "\(formatter.string(from: Date())) \(line)\n"
+        guard let data = entry.data(using: .utf8) else { return }
+
+        if FileManager.default.fileExists(atPath: path),
+           let handle = try? FileHandle(forWritingTo: URL(fileURLWithPath: path)) {
+            handle.seekToEndOfFile()
+            handle.write(data)
+            try? handle.close()
+        } else {
+            try? data.write(to: URL(fileURLWithPath: path), options: .atomic)
+        }
+    }
+
+    private func notificationAttachment(for eventType: EventType) -> UNNotificationAttachment? {
+        let name = eventType == .notification ? "ConfirmNotification" : "DoneNotification"
+        guard let url = Bundle.main.url(forResource: name, withExtension: "png") else {
+            return nil
+        }
+        return try? UNNotificationAttachment(identifier: name, url: url)
+    }
 }
 
 // MARK: - UNUserNotificationCenterDelegate
 
 extension NotificationManager: UNUserNotificationCenterDelegate {
 
-    /// Always show the banner even when our app is "active" (menu bar always is).
-    func userNotificationCenter(
-        _ center: UNUserNotificationCenter,
-        willPresent notification: UNNotification,
-        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
-    ) {
-        completionHandler([.banner, .list])
-    }
-
-    /// User clicked a notification — open the matching project in VSCode.
+    /// User clicked the notification (or the "Open Project" action button) →
+    /// open the project in VSCode.
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
         let id = response.notification.request.identifier
-        if let path = pending[id] {
+        let path = pending[id]
+            ?? (response.notification.request.content.userInfo["cwd"] as? String)
+        if let path {
             DispatchQueue.main.async { [weak self] in
                 self?.onNotificationClicked?(path)
             }

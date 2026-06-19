@@ -34,6 +34,11 @@ chmod +x "$MACOS_DIR/$APP_NAME"
 # Copy Info.plist
 cp "$PROJECT_DIR/Sources/ClaudeNotifier/App/Info.plist" "$CONTENTS/Info.plist"
 
+# Copy notification artwork
+if [ -d "$PROJECT_DIR/Resources/NotificationIcons" ]; then
+    cp "$PROJECT_DIR/Resources/NotificationIcons/"*.png "$RESOURCES_DIR/" 2>/dev/null || true
+fi
+
 # Build .icns from our PNGs using iconutil
 ICONSET_DIR="$RESOURCES_DIR/AppIcon.iconset"
 mkdir -p "$ICONSET_DIR"
@@ -73,6 +78,10 @@ if command -v iconutil >/dev/null 2>&1; then
         echo "  ✅ AppIcon.icns created" || echo "  ⚠️  iconutil failed (non-fatal)"
 fi
 rm -rf "$ICONSET_DIR"
+
+# Ad-hoc code sign — required for UNUserNotificationCenter to deliver
+codesign --force --deep --sign - "$APP_BUNDLE" 2>/dev/null && \
+    echo "  ✅ Codesigned" || echo "  ⚠️  Codesign failed (non-fatal)"
 
 echo ""
 echo "✅ App bundle: $APP_BUNDLE"
