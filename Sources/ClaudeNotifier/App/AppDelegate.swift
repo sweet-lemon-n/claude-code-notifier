@@ -11,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var soundManager: SoundManager!
     private var notificationManager: NotificationManager!
     private var ipcServer: IPCServer!
+    private var hookManager: HookManager!
 
     // UI
     private var statusItem: NSStatusItem!
@@ -30,6 +31,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         vscodeManager = VSCodeManager()
         soundManager = SoundManager(settings: settingsStore)
         notificationManager = NotificationManager(settings: settingsStore)
+        hookManager = HookManager()
 
         // Wire notification click → activate VSCode
         notificationManager.onNotificationClicked = { [weak self] path in
@@ -52,9 +54,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             self?.handleIncomingEvent(type: eventType, payload: payload)
         }
         ipcServer?.start()
+        hookManager.start()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        hookManager?.stop()
         ipcServer?.stop()
     }
 

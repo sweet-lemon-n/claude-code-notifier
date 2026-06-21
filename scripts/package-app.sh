@@ -39,6 +39,11 @@ if [ -d "$PROJECT_DIR/Resources/NotificationIcons" ]; then
     cp "$PROJECT_DIR/Resources/NotificationIcons/"*.png "$RESOURCES_DIR/" 2>/dev/null || true
 fi
 
+# Copy the Claude Code hook bridge into the app bundle so installed hooks do not
+# depend on the source checkout staying in place.
+cp "$PROJECT_DIR/scripts/notify.sh" "$RESOURCES_DIR/notify.sh"
+chmod +x "$RESOURCES_DIR/notify.sh"
+
 # Build .icns from our PNGs using iconutil
 ICONSET_DIR="$RESOURCES_DIR/AppIcon.iconset"
 mkdir -p "$ICONSET_DIR"

@@ -32,7 +32,10 @@ fi
 echo "🔧 Configuring Claude Code hooks..."
 mkdir -p "$SETTINGS_DIR"
 
-NOTIFY_SH="$SCRIPT_DIR/notify.sh"
+NOTIFY_SH="$INSTALL_PATH/Contents/Resources/notify.sh"
+if [ ! -f "$NOTIFY_SH" ]; then
+    NOTIFY_SH="$SCRIPT_DIR/notify.sh"
+fi
 chmod +x "$NOTIFY_SH"
 
 # Backup existing settings
