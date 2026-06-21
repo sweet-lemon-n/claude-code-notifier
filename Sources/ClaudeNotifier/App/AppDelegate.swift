@@ -84,8 +84,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             guard self.settingsStore.isNotificationEnabled(for: type) else { return }
-            self.soundManager.play(for: type)
-            self.notificationManager.send(eventType: type, payload: payload)
+            if self.notificationManager.send(eventType: type, payload: payload) {
+                self.soundManager.play(for: type)
+            }
         }
     }
 

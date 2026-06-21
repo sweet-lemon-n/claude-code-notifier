@@ -64,14 +64,14 @@ final class NotificationManager: NSObject, ObservableObject {
 
     // MARK: - Send
 
-    @MainActor func send(eventType: EventType, payload: HookPayload) {
+    @MainActor func send(eventType: EventType, payload: HookPayload) -> Bool {
         let now = Date()
 
         pruneRecentlySent(now: now)
         let key = deduplicationKey(eventType: eventType, payload: payload)
         if let lastTime = recentlySent[key],
            now.timeIntervalSince(lastTime) < duplicateWindow {
-            return
+            return false
         }
         recentlySent[key] = now
 
@@ -125,6 +125,7 @@ final class NotificationManager: NSObject, ObservableObject {
         }
 
         logLatency(eventType: eventType, payload: payload)
+        return true
     }
 
     // MARK: - History

@@ -72,10 +72,15 @@ final class CodexSessionMonitor {
         guard let text = String(data: data, encoding: .utf8) else { return }
 
         var cwd: String?
+        var isUserThread = false
         for line in text.split(separator: "\n", omittingEmptySubsequences: true) {
             guard let lineData = String(line).data(using: .utf8),
                   let object = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any],
                   let payload = object["payload"] as? [String: Any] else { continue }
+
+            if object["type"] as? String == "session_meta" {
+                isUserThread = payload["thread_source"] as? String == "user"
+            }
 
             if cwd == nil {
                 cwd = payload["cwd"] as? String
@@ -88,8 +93,8 @@ final class CodexSessionMonitor {
             guard !seenCompletions.contains(key) else { continue }
             seenCompletions.insert(key)
 
-            guard deliverNewEvents else { continue }
-            appendLog("codex session task_complete file=\(file.lastPathComponent) turn_id=\(turnID)")
+            guard deliverNewEvents, isUserThread else { continue }
+            appendLog("codex user session task_complete file=\(file.lastPathComponent) turn_id=\(turnID)")
             onComplete(makePayload(file: file, cwd: cwd, taskComplete: payload))
         }
     }
