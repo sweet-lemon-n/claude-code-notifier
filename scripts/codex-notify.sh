@@ -6,11 +6,17 @@ set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 NOTIFY_SH="$SCRIPT_DIR/notify.sh"
+LOG_FILE="$HOME/.codex/code-notifier-codex-notify.log"
+
+printf '%s codex-notify invoked args=%s cwd=%s\n' \
+    "$(date '+%Y-%m-%d %H:%M:%S')" "$*" "${PWD:-}" >> "$LOG_FILE" 2>/dev/null || true
 
 PAYLOAD=""
 if [ ! -t 0 ]; then
     PAYLOAD=$(cat 2>/dev/null || true)
 fi
+printf '%s payload_bytes=%s\n' \
+    "$(date '+%Y-%m-%d %H:%M:%S')" "${#PAYLOAD}" >> "$LOG_FILE" 2>/dev/null || true
 
 if [ -x "$NOTIFY_SH" ]; then
     printf '%s' "$PAYLOAD" | "$NOTIFY_SH" codex_stop >/dev/null 2>&1 || true

@@ -13,6 +13,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var ipcServer: IPCServer!
     private var hookManager: HookManager!
     private var codexNotifyManager: CodexNotifyManager!
+    private var codexSessionMonitor: CodexSessionMonitor!
 
     // UI
     private var statusItem: NSStatusItem!
@@ -34,6 +35,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         notificationManager = NotificationManager(settings: settingsStore)
         hookManager = HookManager()
         codexNotifyManager = CodexNotifyManager()
+        codexSessionMonitor = CodexSessionMonitor { [weak self] payload in
+            self?.handleIncomingEvent(type: .codexStop, payload: payload)
+        }
 
         // Wire notification click → activate VSCode
         notificationManager.onNotificationClicked = { [weak self] path in
@@ -58,9 +62,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         ipcServer?.start()
         hookManager.start()
         codexNotifyManager.start()
+        codexSessionMonitor.start()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        codexSessionMonitor?.stop()
         codexNotifyManager?.stop()
         hookManager?.stop()
         ipcServer?.stop()

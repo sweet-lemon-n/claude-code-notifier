@@ -11,6 +11,24 @@ struct HookPayload: Codable {
     let notifierSourceEvent: String?
     let actionSummary: String?
 
+    init(event: EventType,
+         cwd: String?,
+         message: String?,
+         sessionId: String?,
+         transcriptPath: String?,
+         notifierScriptReceivedAt: TimeInterval?,
+         notifierSourceEvent: String?,
+         actionSummary: String?) {
+        self.event = event
+        self.cwd = cwd
+        self.message = message
+        self.sessionId = sessionId
+        self.transcriptPath = transcriptPath
+        self.notifierScriptReceivedAt = notifierScriptReceivedAt
+        self.notifierSourceEvent = notifierSourceEvent
+        self.actionSummary = actionSummary
+    }
+
     enum CodingKeys: String, CodingKey {
         case event, cwd, message
         case sessionId = "session_id"
