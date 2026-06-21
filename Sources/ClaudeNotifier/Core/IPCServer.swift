@@ -60,7 +60,7 @@ final class IPCServer {
                 self.actualPort = port
             }
             self.writePortFile()
-            print("[ClaudeNotifier] IPC server listening on 127.0.0.1:\(self.actualPort)")
+            print("[CodeNotifier] IPC server listening on 127.0.0.1:\(self.actualPort)")
         }
     }
 
@@ -79,7 +79,7 @@ final class IPCServer {
         listener?.stateUpdateHandler = { state in
             switch state {
             case .failed(let error):
-                print("[ClaudeNotifier] IPC server error: \(error)")
+                print("[CodeNotifier] IPC server error: \(error)")
             default:
                 break
             }
@@ -90,7 +90,7 @@ final class IPCServer {
         connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) {
             [weak self] data, _, isComplete, error in
             if let error {
-                print("[ClaudeNotifier] Receive error: \(error)")
+                print("[CodeNotifier] Receive error: \(error)")
                 connection.cancel()
                 return
             }

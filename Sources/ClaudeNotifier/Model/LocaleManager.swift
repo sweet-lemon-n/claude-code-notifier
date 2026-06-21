@@ -15,7 +15,7 @@ enum LocaleManager {
 enum L10n {
     // Menu bar
     static var menuTitle: String {
-        isCN ? "Claude 提醒" : "Claude Notifier"
+        isCN ? "代码提醒" : "Code Notifier"
     }
     static var listening: String {
         isCN ? "本地服务运行中" : "Listening on 127.0.0.1"
@@ -30,7 +30,7 @@ enum L10n {
         isCN ? "设置\u{2026}" : "Settings\u{2026}"
     }
     static var quitButton: String {
-        isCN ? "退出 Claude Notifier" : "Quit Claude Notifier"
+        isCN ? "退出代码提醒" : "Quit Code Notifier"
     }
     static var muteTooltip: String {
         isCN ? "切换静音" : "Toggle Mute"
@@ -38,7 +38,7 @@ enum L10n {
 
     // Settings window
     static var settingsWindowTitle: String {
-        isCN ? "Claude Notifier 设置" : "Claude Notifier Settings"
+        isCN ? "代码提醒设置" : "Code Notifier Settings"
     }
 
     // Tab labels
@@ -80,8 +80,8 @@ enum L10n {
     // About tab
     static var versionLabel: String { "Version 1.0.0" }
     static var aboutDescription: String {
-        isCN ? "Claude Code 桌面通知工具。\n当 Claude 完成任务或需要你确认时发出提醒。"
-             : "Desktop notifications for Claude Code.\nGet alerted when Claude finishes a task or needs your input."
+        isCN ? "Claude Code 和 Codex 的桌面通知工具。\n当任务完成或需要确认时发出提醒。"
+             : "Desktop notifications for Claude Code and Codex.\nGet alerted when tasks finish or need your input."
     }
     static var githubLink: String {
         "GitHub Repository"
@@ -93,7 +93,7 @@ enum L10n {
     static var notifDisplayName: String { isCN ? "需要确认" : "Needs Confirmation" }
 
     // Default notification content
-    static var defaultTitle: String { "Claude Code" }
+    static var defaultTitle: String { "Code Notifier" }
     static var defaultStopSubtitle: String { isCN ? "任务已完成" : "Task Complete" }
     static var defaultStopMessage: String {
         isCN ? "Claude 已写完，等你确认下一步"

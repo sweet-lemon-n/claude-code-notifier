@@ -9,13 +9,13 @@ final class HookManager {
     private var directoryDescriptor: CInt = -1
     private var settingsDescriptor: CInt = -1
     private var debounceWorkItem: DispatchWorkItem?
-    private let queue = DispatchQueue(label: "ClaudeNotifier.HookManager")
+    private let queue = DispatchQueue(label: "CodeNotifier.HookManager")
 
     init() {
         let home = FileManager.default.homeDirectoryForCurrentUser
         self.settingsURL = home.appendingPathComponent(".claude/settings.json")
         self.notifyScriptPath = Bundle.main.path(forResource: "notify", ofType: "sh")
-            ?? "\(home.path)/.claude/claude-notifier/notify.sh"
+            ?? "\(home.path)/.claude/code-notifier/notify.sh"
     }
 
     deinit {

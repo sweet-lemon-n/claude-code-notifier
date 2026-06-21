@@ -28,6 +28,7 @@ final class SoundManager {
     /// Play the sound configured for the given event.
     @MainActor func play(for event: EventType) {
         guard settings.enableSound, !settings.muted else { return }
+        guard settings.isNotificationEnabled(for: event) else { return }
         playSound(name: settings.soundName(for: event))
     }
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Claude Notifier bridge script
-# Called by Claude Code hooks (Stop / Notification).
-# Forwards event data to the running ClaudeNotifier.app via local HTTP.
+# Code Notifier bridge script
+# Called by Claude Code hooks and Codex notify commands.
+# Forwards event data to the running CodeNotifier.app via local HTTP.
 # Falls back to osascript if the app is not running.
 set -u
 
@@ -122,6 +122,8 @@ def describe_tool(data):
 source_event = event
 if event in ("permission", "permission_request", "pretool", "question"):
     out["event"] = "notification"
+elif event in ("codex", "codex_stop", "codex_turn_ended", "turn-ended"):
+    out["event"] = "codex_stop"
 else:
     out["event"] = event
 
@@ -134,6 +136,11 @@ else:
 if action_summary and source_event in ("permission", "permission_request", "pretool", "question"):
     out["action_summary"] = action_summary
     out["message"] = action_summary
+elif out["event"] == "codex_stop":
+    out["message"] = clean(
+        out.get("message") or out.get("summary") or out.get("last_message") or "Codex turn ended",
+        220
+    )
 out["notifier_script_received_at"] = time.time()
 print(json.dumps(out, ensure_ascii=False))
 PYEOF
@@ -159,7 +166,10 @@ if [ -f "$PORT_FILE" ]; then
 fi
 
 # ---- fallback: app not running → launch it and retry -------------------------
-APP="/Applications/ClaudeNotifier.app"
+APP="/Applications/CodeNotifier.app"
+if [ ! -d "$APP" ]; then
+    APP="/Applications/ClaudeNotifier.app"
+fi
 if [ -d "$APP" ]; then
     open -a "$APP" --hide 2>/dev/null || true
     # Give the app a moment to bind its server

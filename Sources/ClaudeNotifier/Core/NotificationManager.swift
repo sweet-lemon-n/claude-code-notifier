@@ -55,9 +55,9 @@ final class NotificationManager: NSObject, ObservableObject {
             options: [.alert, .sound, .badge]
         ) { granted, error in
             if let error {
-                print("[ClaudeNotifier] UN auth error: \(error)")
+                print("[CodeNotifier] UN auth error: \(error)")
             } else {
-                print("[ClaudeNotifier] UN auth granted: \(granted)")
+                print("[CodeNotifier] UN auth granted: \(granted)")
             }
         }
     }
@@ -93,14 +93,16 @@ final class NotificationManager: NSObject, ObservableObject {
         content.subtitle = built.subtitle
         content.body = built.body
         content.sound = .default
-        content.categoryIdentifier = eventType == .notification
+        content.categoryIdentifier = eventType.isConfirmation
             ? "CLAUDE_NOTIFIER_CONFIRM"
             : "CLAUDE_NOTIFIER_DONE"
         content.interruptionLevel = .active
-        if eventType == .notification {
-            content.threadIdentifier = "claude-notifier-confirmation"
+        if eventType.isConfirmation {
+            content.threadIdentifier = "code-notifier-confirmation"
         } else {
-            content.threadIdentifier = "claude-notifier-completion"
+            content.threadIdentifier = eventType == .codexStop
+                ? "code-notifier-codex-completion"
+                : "code-notifier-claude-completion"
         }
         if let attachment = notificationAttachment(for: eventType) {
             content.attachments = [attachment]
@@ -118,7 +120,7 @@ final class NotificationManager: NSObject, ObservableObject {
 
         UNUserNotificationCenter.current().add(request) { error in
             if let error {
-                print("[ClaudeNotifier] deliver error: \(error)")
+                print("[CodeNotifier] deliver error: \(error)")
             }
         }
 
@@ -160,7 +162,7 @@ final class NotificationManager: NSObject, ObservableObject {
         let now = Date().timeIntervalSince1970
         let ipcDelay = max(0, now - scriptReceived)
         let source = payload.notifierSourceEvent ?? eventType.rawValue
-        let line = "[ClaudeNotifier] \(eventType.rawValue)(source=\(source)) hook-to-app delay: \(String(format: "%.3f", ipcDelay))s"
+        let line = "[CodeNotifier] \(eventType.rawValue)(source=\(source)) hook-to-app delay: \(String(format: "%.3f", ipcDelay))s"
         print(line)
         appendLatencyLog(line)
     }
@@ -183,7 +185,7 @@ final class NotificationManager: NSObject, ObservableObject {
     }
 
     private func notificationAttachment(for eventType: EventType) -> UNNotificationAttachment? {
-        let name = eventType == .notification ? "ConfirmNotification" : "DoneNotification"
+        let name = eventType.isConfirmation ? "ConfirmNotification" : "DoneNotification"
         guard let url = Bundle.main.url(forResource: name, withExtension: "png") else {
             return nil
         }

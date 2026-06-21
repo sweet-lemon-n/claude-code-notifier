@@ -1,11 +1,11 @@
-# Claude Notifier
+# Code Notifier
 
 [English](#english) | [中文](#中文)
 
-Native macOS notifications for Claude Code. Get a fast alert when Claude Code needs permission, and a separate completion alert when the turn finishes.
+Native macOS notifications for Claude Code and Codex. Get fast Claude Code confirmation alerts, Claude completion alerts, and Codex completion alerts.
 
 <p align="center">
-  <img src="Resources/Assets.xcassets/AppIcon.appiconset/icon_128.png" width="128" alt="Claude Notifier icon">
+  <img src="Resources/Assets.xcassets/AppIcon.appiconset/icon_128.png" width="128" alt="Code Notifier icon">
 </p>
 
 ---
@@ -17,6 +17,8 @@ Native macOS notifications for Claude Code. Get a fast alert when Claude Code ne
 - 实时确认提醒：通过 `PermissionRequest` hook 在权限请求出现时通知，而不是等待较慢的 `Notification` 事件。
 - 操作详情：确认通知会尽量显示工具名、描述、命令或文件路径，例如 `Bash: Delete 123.txt - rm ...`。
 - 完成提醒：通过 `Stop` hook 在任务结束时发送通知，并从 transcript 中提取最近操作和结果摘要。
+- Codex 完成提醒：通过 Codex `notify` 配置在 turn ended 时发送通知。
+- 可自定义通知类型：可以分别开启或关闭 Claude 确认、Claude 完成、Codex 完成。
 - 前台 App + 后台服务：启动后有正常窗口和 Dock 图标；关闭窗口后仍在菜单栏后台运行。
 - 不同图标：确认通知和完成通知使用不同的通知附件图标。
 - 菜单栏历史：菜单栏弹窗和主窗口都能查看最近通知。
@@ -36,6 +38,7 @@ make install
 
 - macOS 14.0+
 - Claude Code
+- Codex
 - Xcode Command Line Tools
 - Visual Studio Code 可选，用于点击通知后跳转项目窗口
 
@@ -46,11 +49,16 @@ Claude Code hooks
   PermissionRequest / Stop / idle Notification
     -> scripts/notify.sh
       -> http://127.0.0.1:<port>/event
-        -> ClaudeNotifier.app
+        -> CodeNotifier.app
           -> macOS notification + sound + recent history
+
+Codex notify
+  turn-ended
+    -> scripts/codex-notify.sh
+      -> scripts/notify.sh codex_stop
 ```
 
-安装脚本会写入 `~/.claude/settings.json`：
+安装脚本会写入 `~/.claude/settings.json`，并配置 `~/.codex/config.toml` 的 `notify`：
 
 - `PermissionRequest` -> 实时确认通知
 - `Stop` -> 完成通知
@@ -70,7 +78,7 @@ make install
 ./scripts/uninstall.sh
 ```
 
-卸载会停止 App、删除 `/Applications/ClaudeNotifier.app`、移除 Claude Code hooks，并清理端口文件。
+卸载会停止 App、删除 `/Applications/CodeNotifier.app`、移除 Claude Code hooks，并尽量恢复 Codex 原来的 `notify` 配置。
 
 ### 说明
 
@@ -89,6 +97,8 @@ MIT
 - Fast permission alerts via Claude Code's `PermissionRequest` hook.
 - Action details in confirmation notifications, such as tool name, command, description, or file path.
 - Completion alerts via the `Stop` hook, with recent action and result summaries extracted from the transcript when available.
+- Codex completion alerts via Codex `notify` on turn ended.
+- Per-type notification toggles for Claude confirmations, Claude completions, and Codex completions.
 - Foreground macOS app plus background menu-bar service. Closing the main window keeps the notifier running.
 - Separate confirmation and completion notification artwork.
 - Recent notification history in the menu-bar popover and main window.
@@ -108,6 +118,7 @@ Restart Claude Code after installation so hooks are reloaded.
 
 - macOS 14.0+
 - Claude Code
+- Codex
 - Xcode Command Line Tools
 - Visual Studio Code optional, for click-to-open-project behavior
 
@@ -118,11 +129,16 @@ Claude Code hooks
   PermissionRequest / Stop / idle Notification
     -> scripts/notify.sh
       -> http://127.0.0.1:<port>/event
-        -> ClaudeNotifier.app
+        -> CodeNotifier.app
           -> macOS notification + sound + recent history
+
+Codex notify
+  turn-ended
+    -> scripts/codex-notify.sh
+      -> scripts/notify.sh codex_stop
 ```
 
-The installer updates `~/.claude/settings.json` with:
+The installer updates `~/.claude/settings.json` and configures Codex `notify` in `~/.codex/config.toml`.
 
 - `PermissionRequest` for fast confirmation alerts
 - `Stop` for completion alerts

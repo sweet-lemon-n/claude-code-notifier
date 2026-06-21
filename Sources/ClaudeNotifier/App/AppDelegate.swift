@@ -12,6 +12,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var notificationManager: NotificationManager!
     private var ipcServer: IPCServer!
     private var hookManager: HookManager!
+    private var codexNotifyManager: CodexNotifyManager!
 
     // UI
     private var statusItem: NSStatusItem!
@@ -32,6 +33,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         soundManager = SoundManager(settings: settingsStore)
         notificationManager = NotificationManager(settings: settingsStore)
         hookManager = HookManager()
+        codexNotifyManager = CodexNotifyManager()
 
         // Wire notification click → activate VSCode
         notificationManager.onNotificationClicked = { [weak self] path in
@@ -55,9 +57,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         ipcServer?.start()
         hookManager.start()
+        codexNotifyManager.start()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        codexNotifyManager?.stop()
         hookManager?.stop()
         ipcServer?.stop()
     }
@@ -73,6 +77,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private func handleIncomingEvent(type: EventType, payload: HookPayload) {
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
+            guard self.settingsStore.isNotificationEnabled(for: type) else { return }
             self.soundManager.play(for: type)
             self.notificationManager.send(eventType: type, payload: payload)
         }
@@ -87,7 +92,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             // Use SF Symbol as the menu bar icon — always crisp, adapts to theme
             let image = NSImage(
                 systemSymbolName: "bell.badge.fill",
-                accessibilityDescription: "Claude Notifier"
+                accessibilityDescription: "Code Notifier"
             )
             // Pick a size that fits well in the menu bar
             let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .medium)

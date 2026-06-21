@@ -6,7 +6,7 @@ set -e
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD_DIR="$PROJECT_DIR/.build"
 BINARY_PATH="$BUILD_DIR/release/ClaudeNotifier"
-APP_NAME="ClaudeNotifier"
+APP_NAME="CodeNotifier"
 APP_BUNDLE="$BUILD_DIR/$APP_NAME.app"
 CONTENTS="$APP_BUNDLE/Contents"
 MACOS_DIR="$CONTENTS/MacOS"
@@ -43,6 +43,8 @@ fi
 # depend on the source checkout staying in place.
 cp "$PROJECT_DIR/scripts/notify.sh" "$RESOURCES_DIR/notify.sh"
 chmod +x "$RESOURCES_DIR/notify.sh"
+cp "$PROJECT_DIR/scripts/codex-notify.sh" "$RESOURCES_DIR/codex-notify.sh"
+chmod +x "$RESOURCES_DIR/codex-notify.sh"
 
 # Build .icns from our PNGs using iconutil
 ICONSET_DIR="$RESOURCES_DIR/AppIcon.iconset"

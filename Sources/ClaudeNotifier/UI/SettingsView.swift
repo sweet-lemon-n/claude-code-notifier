@@ -36,6 +36,24 @@ struct GeneralTab: View {
     var body: some View {
         Form {
             Section {
+                Toggle(isOn: $settings.notifyClaudeConfirmation) {
+                    Text(LocaleManager.isChinese ? "Claude 需要确认" : "Claude confirmations")
+                }
+                Toggle(isOn: $settings.notifyClaudeCompletion) {
+                    Text(LocaleManager.isChinese ? "Claude 任务完成" : "Claude completions")
+                }
+                Toggle(isOn: $settings.notifyCodexCompletion) {
+                    Text(LocaleManager.isChinese ? "Codex 任务完成" : "Codex completions")
+                }
+            } header: {
+                Text(LocaleManager.isChinese ? "通知类型" : "Notification Types")
+            } footer: {
+                Text(LocaleManager.isChinese
+                     ? "关闭某一项后，App 仍会保持 hooks 配置，但不会弹出对应通知。"
+                     : "Disabled types keep their hooks installed but will not show alerts.")
+            }
+
+            Section {
                 Toggle(L10n.launchAtLogin, isOn: $settings.launchAtLogin)
                 Toggle(L10n.showPreview, isOn: $settings.showNotificationPreview)
                 Toggle(L10n.enableSound, isOn: $settings.enableSound)

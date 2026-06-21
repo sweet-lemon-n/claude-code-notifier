@@ -24,12 +24,14 @@ struct NotificationContentBuilder {
             title = LocaleManager.isChinese ? "Claude 已完成" : "Claude Finished"
         case .notification:
             title = LocaleManager.isChinese ? "需要确认" : "Action Required"
+        case .codexStop:
+            title = LocaleManager.isChinese ? "Codex 已完成" : "Codex Finished"
         }
 
         // ---- subtitle --------------------------------------------------------
         let subtitle: String
         switch eventType {
-        case .stop:
+        case .stop, .codexStop:
             subtitle = projectName.isEmpty
                 ? (LocaleManager.isChinese ? "任务完成" : "Task complete")
                 : (LocaleManager.isChinese ? "\(projectName) 完成了" : "\(projectName) completed")
@@ -52,9 +54,12 @@ struct NotificationContentBuilder {
                       let msg = payload.message, !msg.isEmpty {
                 parts.append(msg)
             }
-        case .stop:
+        case .stop, .codexStop:
             if let action = summary.lastAction, !action.isEmpty {
                 parts.append((LocaleManager.isChinese ? "完成: " : "Completed: ") + action)
+            }
+            if let message = payload.message, !message.isEmpty {
+                parts.append(message)
             }
             if let completion = summary.completionSummary, !completion.isEmpty {
                 parts.append((LocaleManager.isChinese ? "结果: " : "Result: ") + completion)
@@ -99,6 +104,10 @@ struct NotificationContentBuilder {
             return LocaleManager.isChinese
                 ? "Claude 需要你确认一个操作。"
                 : "Claude needs your confirmation."
+        case .codexStop:
+            return LocaleManager.isChinese
+                ? "Codex 已完成任务。"
+                : "Codex has finished the task."
         }
     }
 

@@ -1,8 +1,9 @@
-APP_NAME = ClaudeNotifier
+APP_NAME = CodeNotifier
 BUILD_DIR = .build
-BINARY = $(BUILD_DIR)/release/$(APP_NAME)
+BINARY = $(BUILD_DIR)/release/ClaudeNotifier
 APP_BUNDLE = $(BUILD_DIR)/$(APP_NAME).app
 INSTALL_PATH = /Applications/$(APP_NAME).app
+OLD_INSTALL_PATH = /Applications/ClaudeNotifier.app
 
 .PHONY: build package install clean
 
@@ -20,8 +21,15 @@ install: package
 	@echo "📦 Installing to /Applications..."
 	@if [ -d "$(INSTALL_PATH)" ]; then \
 		pkill -f "$(APP_NAME)" 2>/dev/null || true; \
+		pkill -f "ClaudeNotifier" 2>/dev/null || true; \
 		sleep 1; \
 		rm -rf "$(INSTALL_PATH)"; \
+	fi
+	@if [ -d "$(OLD_INSTALL_PATH)" ]; then \
+		pkill -f "$(APP_NAME)" 2>/dev/null || true; \
+		pkill -f "ClaudeNotifier" 2>/dev/null || true; \
+		sleep 1; \
+		rm -rf "$(OLD_INSTALL_PATH)"; \
 	fi
 	cp -R "$(APP_BUNDLE)" "$(INSTALL_PATH)"
 	@echo "✅ Installed to $(INSTALL_PATH)"

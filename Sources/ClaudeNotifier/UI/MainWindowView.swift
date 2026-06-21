@@ -70,14 +70,20 @@ struct MainWindowView: View {
             statRow(
                 icon: "exclamationmark.triangle.fill",
                 tint: .orange,
-                title: LocaleManager.isChinese ? "确认提醒" : "Confirmations",
+                title: LocaleManager.isChinese ? "Claude 确认" : "Claude Confirm",
                 value: "\(count(for: .notification))"
             )
             statRow(
                 icon: "checkmark.circle.fill",
                 tint: .green,
-                title: LocaleManager.isChinese ? "完成通知" : "Completions",
+                title: LocaleManager.isChinese ? "Claude 完成" : "Claude Done",
                 value: "\(count(for: .stop))"
+            )
+            statRow(
+                icon: "chevron.left.forwardslash.chevron.right",
+                tint: .purple,
+                title: LocaleManager.isChinese ? "Codex 完成" : "Codex Done",
+                value: "\(count(for: .codexStop))"
             )
             statRow(
                 icon: settings.muted ? "speaker.slash.fill" : "speaker.wave.2.fill",
@@ -113,8 +119,8 @@ struct MainWindowView: View {
                     LocaleManager.isChinese ? "还没有通知" : "No Notifications Yet",
                     systemImage: "bell",
                     description: Text(LocaleManager.isChinese
-                                      ? "ClaudeCode 需要确认或任务完成时会出现在这里。"
-                                      : "Confirmations and completions will appear here.")
+                                      ? "Claude 和 Codex 的通知会出现在这里。"
+                                      : "Claude and Codex notifications will appear here.")
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
@@ -153,10 +159,8 @@ struct MainWindowView: View {
             }
         } label: {
             HStack(alignment: .top, spacing: 12) {
-                Image(systemName: record.eventType == .notification
-                      ? "exclamationmark.triangle.fill"
-                      : "checkmark.circle.fill")
-                    .foregroundColor(record.eventType == .notification ? .orange : .green)
+                Image(systemName: iconName(for: record.eventType))
+                    .foregroundColor(tint(for: record.eventType))
                     .font(.title3)
                     .frame(width: 28, height: 28)
 
@@ -182,5 +186,21 @@ struct MainWindowView: View {
 
     private func count(for eventType: EventType) -> Int {
         notificationManager.recentNotifications.filter { $0.eventType == eventType }.count
+    }
+
+    private func iconName(for eventType: EventType) -> String {
+        switch eventType {
+        case .notification: return "exclamationmark.triangle.fill"
+        case .stop: return "checkmark.circle.fill"
+        case .codexStop: return "chevron.left.forwardslash.chevron.right"
+        }
+    }
+
+    private func tint(for eventType: EventType) -> Color {
+        switch eventType {
+        case .notification: return .orange
+        case .stop: return .green
+        case .codexStop: return .purple
+        }
     }
 }

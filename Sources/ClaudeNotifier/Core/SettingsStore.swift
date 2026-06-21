@@ -17,6 +17,9 @@ final class SettingsStore: ObservableObject {
             "showProjectNameInNotif": true,
             "showTimestampInNotif": true,
             "useClaudeMessageInNotif": true,
+            "notifyClaudeCompletion": true,
+            "notifyClaudeConfirmation": true,
+            "notifyCodexCompletion": true,
             "launchAtLogin": false,
             "showNotificationPreview": true,
             "enableSound": true,
@@ -51,6 +54,17 @@ final class SettingsStore: ObservableObject {
     @AppStorage("useClaudeMessageInNotif")
     var useClaudeMessageInNotif: Bool = true
 
+    // MARK: - Notification types
+
+    @AppStorage("notifyClaudeCompletion")
+    var notifyClaudeCompletion: Bool = true
+
+    @AppStorage("notifyClaudeConfirmation")
+    var notifyClaudeConfirmation: Bool = true
+
+    @AppStorage("notifyCodexCompletion")
+    var notifyCodexCompletion: Bool = true
+
     // MARK: - Behavior
 
     @AppStorage("launchAtLogin")
@@ -75,8 +89,16 @@ final class SettingsStore: ObservableObject {
 
     func soundName(for event: EventType) -> String {
         switch event {
-        case .stop: return soundForStop
+        case .stop, .codexStop: return soundForStop
         case .notification: return soundForNotification
+        }
+    }
+
+    func isNotificationEnabled(for event: EventType) -> Bool {
+        switch event {
+        case .stop: return notifyClaudeCompletion
+        case .notification: return notifyClaudeConfirmation
+        case .codexStop: return notifyCodexCompletion
         }
     }
 
@@ -88,7 +110,7 @@ final class SettingsStore: ObservableObject {
     /// Default subtitle for an event based on locale
     func effectiveSubtitle(for event: EventType) -> String {
         switch event {
-        case .stop: return L10n.defaultStopSubtitle
+        case .stop, .codexStop: return L10n.defaultStopSubtitle
         case .notification: return L10n.defaultNotifSubtitle
         }
     }
@@ -103,7 +125,7 @@ final class SettingsStore: ObservableObject {
                 try SMAppService.mainApp.unregister()
             }
         } catch {
-            print("[ClaudeNotifier] SMAppService error: \(error.localizedDescription)")
+            print("[CodeNotifier] SMAppService error: \(error.localizedDescription)")
         }
     }
 }
