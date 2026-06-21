@@ -50,6 +50,33 @@ def nested(data, *keys):
         current = current.get(key)
     return current
 
+def describe_question(data):
+    tool_obj = first_dict(data.get("tool"), data.get("tool_use"), data.get("toolUse"))
+    tool_input = first_dict(
+        data.get("tool_input"),
+        data.get("toolInput"),
+        data.get("input"),
+        tool_obj.get("input")
+    )
+    questions = tool_input.get("questions") or data.get("questions")
+    if not isinstance(questions, list) or not questions:
+        question = clean(tool_input.get("question") or data.get("question"), 220)
+        return f"需要选择: {question}" if question else ""
+
+    first = questions[0] if isinstance(questions[0], dict) else {}
+    title = clean(first.get("question") or first.get("header"), 220)
+    options = first.get("options")
+    labels = []
+    if isinstance(options, list):
+        for option in options[:3]:
+            if isinstance(option, dict):
+                label = clean(option.get("label"), 40)
+                if label:
+                    labels.append(label)
+    suffix = f" 选项: {' / '.join(labels)}" if labels else ""
+    count = f" 等 {len(questions)} 个问题" if len(questions) > 1 else ""
+    return f"需要选择: {title}{count}{suffix}" if title else ""
+
 def describe_tool(data):
     tool_obj = first_dict(data.get("tool"), data.get("tool_use"), data.get("toolUse"))
     tool_name = (
@@ -93,15 +120,18 @@ def describe_tool(data):
     return clean(tool_name)
 
 source_event = event
-if event in ("permission", "permission_request", "pretool"):
+if event in ("permission", "permission_request", "pretool", "question"):
     out["event"] = "notification"
 else:
     out["event"] = event
 
 out["cwd"] = out.get("cwd") or fallback_cwd
 out["notifier_source_event"] = source_event
-action_summary = describe_tool(out)
-if action_summary and source_event in ("permission", "permission_request", "pretool"):
+if source_event == "question":
+    action_summary = describe_question(out) or describe_tool(out)
+else:
+    action_summary = describe_tool(out)
+if action_summary and source_event in ("permission", "permission_request", "pretool", "question"):
     out["action_summary"] = action_summary
     out["message"] = action_summary
 out["notifier_script_received_at"] = time.time()
@@ -110,8 +140,8 @@ PYEOF
 )
 
 printf '%s notify.sh received event=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$EVENT" >> "$LOG_FILE" 2>/dev/null || true
-if [ "$EVENT" = "permission" ] || [ "$EVENT" = "permission_request" ] || [ "$EVENT" = "pretool" ]; then
-    printf '%s permission payload=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$SEND_JSON" >> "$LOG_FILE" 2>/dev/null || true
+if [ "$EVENT" = "permission" ] || [ "$EVENT" = "permission_request" ] || [ "$EVENT" = "pretool" ] || [ "$EVENT" = "question" ]; then
+    printf '%s %s payload=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$EVENT" "$SEND_JSON" >> "$LOG_FILE" 2>/dev/null || true
 fi
 
 # ---- try to reach the running app --------------------------------------------

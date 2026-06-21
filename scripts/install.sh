@@ -92,6 +92,7 @@ def upsert(event, arg, matcher=None):
 upsert('Stop', 'stop')
 upsert('Notification', 'notification', 'idle_prompt')
 upsert('PermissionRequest', 'permission')
+upsert('PreToolUse', 'question', 'AskUserQuestion')
 
 with open(settings_file, 'w', encoding='utf-8') as f:
     json.dump(data, f, indent=2, ensure_ascii=False)

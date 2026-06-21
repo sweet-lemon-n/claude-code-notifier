@@ -67,7 +67,7 @@ def is_claude_notifier_command(command):
         return True
     return bool(re.search(r'(^|[/"\s])notify\.sh(["\s]|$)', command))
 
-for event in ['Stop', 'Notification', 'PermissionRequest']:
+for event in ['Stop', 'Notification', 'PermissionRequest', 'PreToolUse']:
     if event not in hooks:
         continue
     matchers = hooks[event]
